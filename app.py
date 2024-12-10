@@ -155,8 +155,7 @@ def get_cached_data(key, fetch_func):
 
 # Add a test route to verify the server is running
 @app.route('/')
-def home():
-    # Remplacez le retour JSON par un template HTML
+def index():
     return render_template('mouradaustade.html')
 
 @app.route('/api/matches/<date>')
@@ -252,6 +251,20 @@ def sitemap():
     </url>
 </urlset>
 """, mimetype='application/xml')
+
+@app.route('/adsense-test')
+def adsense_test():
+    return """
+    <html>
+        <head>
+            <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2259696635983622" crossorigin="anonymous"></script>
+        </head>
+        <body>
+            <h1>Test Page for AdSense</h1>
+            <p>This is a test page for Google AdSense verification.</p>
+        </body>
+    </html>
+    """
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))  # Render utilise généralement le port 10000
