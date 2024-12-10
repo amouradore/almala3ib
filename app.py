@@ -2,13 +2,11 @@ from flask import Flask, jsonify, render_template
 from flask_cors import CORS
 import requests
 from datetime import datetime
-import pytz
-from functools import lru_cache
 import time
 import os
 
 app = Flask(__name__)
-CORS(app)  # Permet les requêtes cross-origin
+CORS(app)
 
 # Cache pour les requêtes API
 CACHE_DURATION = 30  # secondes
@@ -107,5 +105,5 @@ def test_api():
         })
 
 if __name__ == '__main__':
-    # Enable debug mode and specify host/port
-    app.run(debug=True, host='localhost', port=5000)
+    port = int(os.environ.get('PORT', 10000))  # Render utilise généralement le port 10000
+    app.run(host='0.0.0.0', port=port)
