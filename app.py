@@ -190,6 +190,7 @@ def get_matches(date):
                         'stream_url': stream_url,
                         'has_stream': bool(stream_url)
                     }
+                    app.logger.debug(f"Match info: {match_info['team1']} vs {match_info['team2']}, has_stream: {match_info['has_stream']}, stream_url: {match_info['stream_url']}")
                     all_matches.append(match_info)
             
             return all_matches
