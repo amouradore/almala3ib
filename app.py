@@ -12,6 +12,22 @@ CORS(app)
 CACHE_DURATION = 30  # secondes
 cache = {}
 
+STREAM_MAPPINGS = {
+    'Brest-PSV Eindhoven': '19296294',
+    'Girona-Liverpool': '19296291',
+    'Red Bull Salzburg-Paris SG': '19296296',
+    'Bayer Leverkusen-Inter Milan': '19296293',
+    'Dinamo Zagreb-Celtic': 'votre_id_existant',
+    'Atalanta-Real Madrid': 'votre_id_existant'
+}
+
+def get_stream_url(team1, team2):
+    match_key = f"{team1}-{team2}"
+    stream_id = STREAM_MAPPINGS.get(match_key)
+    if stream_id:
+        return f"https://embedme.top/embed/charlie/{team1.lower()}-vs-{team2.lower()}-{stream_id}/1"
+    return None
+
 def get_cached_data(key, fetch_func):
     current_time = time.time()
     if key in cache:
@@ -59,16 +75,7 @@ def get_matches(date):
                         'status': match['status'],
                         'score': f"{match['score']['fullTime']['home'] if match['score']['fullTime']['home'] is not None else '-'}-{match['score']['fullTime']['away'] if match['score']['fullTime']['away'] is not None else '-'}",
                         'competition': match['competition']['name'],
-                        'stats': {
-                            'possession': {
-                                'home': '0',
-                                'away': '0'
-                            },
-                            'shots': {
-                                'home': '0',
-                                'away': '0'
-                            }
-                        }
+                        'stream_url': get_stream_url(match['homeTeam']['name'], match['awayTeam']['name'])
                     }
                     all_matches.append(match_info)
             
