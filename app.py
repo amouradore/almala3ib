@@ -18,7 +18,9 @@ STREAM_MAPPINGS = {
     'Red Bull Salzburg-Paris Saint-Germain': '19296296',
     'Bayer 04 Leverkusen-Inter': '19296293',
     'GNK Dinamo Zagreb-Celtic': '19296290',
-    'Atalanta-Real Madrid': '19296292'
+    'Atalanta-Real Madrid': '19296292',
+    'RB Leipzig-Young Boys': '19296295',
+    'Crvena Zvezda-Manchester City': '19296289'
 }
 
 def normalize_team_name(name):
@@ -26,6 +28,8 @@ def normalize_team_name(name):
         'PSV Eindhoven': 'PSV',
         'Paris SG': 'Paris Saint-Germain',
         'Inter Milan': 'Inter',
+        'Red Star Belgrade': 'Crvena Zvezda',
+        'BSC Young Boys': 'Young Boys',
         # Ajoutez d'autres normalisations si nécessaire
     }
     return normalizations.get(name, name)
