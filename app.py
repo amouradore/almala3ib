@@ -257,7 +257,9 @@ def adsense_test():
     return """
     <html>
         <head>
-            <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2259696635983622" crossorigin="anonymous"></script>
+            <title>Test AdSense</title>
+            <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9547009217122053"
+             crossorigin="anonymous"></script>
         </head>
         <body>
             <h1>Test Page for AdSense</h1>
