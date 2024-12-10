@@ -407,14 +407,50 @@
             </div>
 
             <button class="close-button" onclick="closeStream()">×</button>
-            <iframe id="streamIframe" 
-                    class="stream-iframe"
-                    marginheight="0" 
-                    marginwidth="0" 
-                    scrolling="no" 
-                    allowfullscreen="yes" 
-                    allow="encrypted-media; picture-in-picture;"
-                    frameborder="0"></iframe>
+
+            <!-- Section du lecteur vidéo -->
+            <div class="player-container">
+                <div class="video-wrapper">
+                    <iframe id="streamIframe" 
+                            class="stream-iframe"
+                            marginheight="0" 
+                            marginwidth="0" 
+                            scrolling="no" 
+                            allowfullscreen="yes"
+                            allow="encrypted-media; autoplay; fullscreen; picture-in-picture"
+                            loading="lazy"
+                            frameborder="0">
+                    </iframe>
+                </div>
+
+                <!-- Contrôles personnalisés -->
+                <div class="player-controls">
+                    <button class="quality-selector">Qualité</button>
+                    <button class="fullscreen-toggle">Plein écran</button>
+                </div>
+
+                <script>
+                    // Optimisation du chargement du stream
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const streamIframe = document.getElementById('streamIframe');
+                        
+                        // Chargement différé du stream
+                        setTimeout(() => {
+                            streamIframe.src = 'URL_DU_STREAM';
+                        }, 1000);
+
+                        // Gestion de la qualité adaptative
+                        function adjustStreamQuality() {
+                            const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                            if (connection) {
+                                // Ajuster la qualité en fonction de la connexion
+                                const bandwidth = connection.downlink; // Mbps
+                                // Logique d'adaptation de la qualité
+                            }
+                        }
+                    });
+                </script>
+            </div>
 
             <!-- Pub après le stream -->
             <div class="ad-container post-stream">
