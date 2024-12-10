@@ -51,6 +51,10 @@ STREAM_MAPPINGS = {
     'Club Brugge-Sporting CP': {
         'id': '19296298',
         'source': 'alpha'
+    },
+    'Leverkusen-Inter': {
+        'id': '19296299',
+        'source': 'bravo'
     }
 }
 
@@ -86,7 +90,9 @@ def normalize_team_name(name):
         'Plymouth Argyle FC': 'Plymouth',
         'Swansea City AFC': 'Swansea',
         'Sheffield Wednesday FC': 'Sheffield Wednesday',
-        'Blackburn Rovers FC': 'Blackburn'
+        'Blackburn Rovers FC': 'Blackburn',
+        'Bayer 04 Leverkusen': 'Leverkusen',
+        'Aston Villa FC': 'Aston Villa'
     }
     return normalizations.get(name, name)
 
@@ -113,6 +119,8 @@ def get_stream_url(team1, team2):
     # Normaliser les noms d'équipes
     team1_norm = normalize_team_name(team1)
     team2_norm = normalize_team_name(team2)
+    
+    app.logger.debug(f"Normalized names: {team1_norm} vs {team2_norm}")
     
     # Créer toutes les combinaisons possibles avec les noms normalisés
     possible_keys = [
