@@ -12,15 +12,41 @@ CORS(app)
 CACHE_DURATION = 30  # secondes
 cache = {}
 
+STREAM_SOURCES = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot']
+
 STREAM_MAPPINGS = {
-    'Brest-PSV': '19296294',
-    'Girona-Liverpool': '19296291',
-    'Red Bull Salzburg-Paris Saint-Germain': '19296296',
-    'Bayer 04 Leverkusen-Inter': '19296293',
-    'GNK Dinamo Zagreb-Celtic': '19296290',
-    'Atalanta-Real Madrid': '19296292',
-    'RB Leipzig-Young Boys': '19296295',
-    'Crvena Zvezda-Manchester City': '19296289'
+    'GNK Dinamo Zagreb-Celtic': {
+        'id': '19296290',
+        'source': 'charlie'  # ou la source qui fonctionne le mieux
+    },
+    'Atalanta-Real Madrid': {
+        'id': '19296292',
+        'source': 'charlie'
+    },
+    'Brest-PSV': {
+        'id': '19296294',
+        'source': 'charlie'
+    },
+    'Girona-Liverpool': {
+        'id': '19296291',
+        'source': 'charlie'
+    },
+    'Red Bull Salzburg-Paris Saint-Germain': {
+        'id': '19296296',
+        'source': 'charlie'
+    },
+    'Bayer 04 Leverkusen-Inter': {
+        'id': '19296293',
+        'source': 'charlie'
+    },
+    'RB Leipzig-Young Boys': {
+        'id': '19296295',
+        'source': 'charlie'
+    },
+    'Crvena Zvezda-Manchester City': {
+        'id': '19296289',
+        'source': 'charlie'
+    }
 }
 
 def normalize_team_name(name):
@@ -49,11 +75,10 @@ def get_stream_url(team1, team2):
     
     for key in possible_keys:
         if key in STREAM_MAPPINGS:
-            stream_id = STREAM_MAPPINGS[key]
-            # Construire l'URL avec les noms normalisés pour le chemin
+            stream_info = STREAM_MAPPINGS[key]
             team1_path = team1_norm.lower().replace(' ', '-')
             team2_path = team2_norm.lower().replace(' ', '-')
-            return f"https://embedme.top/embed/charlie/{team1_path}-vs-{team2_path}-{stream_id}/1"
+            return f"https://embedme.top/embed/{stream_info['source']}/{team1_path}-vs-{team2_path}-{stream_info['id']}/1"
     
     return None
 
