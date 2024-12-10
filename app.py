@@ -4,9 +4,14 @@ import requests
 from datetime import datetime
 import time
 import os
+import logging
 
 app = Flask(__name__)
 CORS(app)
+
+# Configuration des logs au début du fichier
+logging.basicConfig(level=logging.DEBUG)
+app.logger.setLevel(logging.DEBUG)
 
 # Cache pour les requêtes API
 CACHE_DURATION = 30  # secondes
@@ -15,19 +20,27 @@ cache = {}
 STREAM_SOURCES = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot']
 
 STREAM_MAPPINGS = {
-    'GNK Dinamo Zagreb-Celtic FC': {
-        'id': '19296290',
-        'source': 'alpha'
-    },
     'Dinamo Zagreb-Celtic': {
         'id': '19296290',
         'source': 'alpha'
     },
-    'Atalanta BC-Real Madrid CF': {
+    'GNK Dinamo Zagreb-Celtic FC': {
+        'id': '19296290',
+        'source': 'alpha'
+    },
+    'Girona-Liverpool': {
+        'id': '19296291',
+        'source': 'charlie'
+    },
+    'Girona FC-Liverpool FC': {
+        'id': '19296291',
+        'source': 'charlie'
+    },
+    'Atalanta-Real Madrid': {
         'id': '19296292',
         'source': 'bravo'
     },
-    'Atalanta-Real Madrid': {
+    'Atalanta BC-Real Madrid CF': {
         'id': '19296292',
         'source': 'bravo'
     },
@@ -35,24 +48,8 @@ STREAM_MAPPINGS = {
         'id': '19296294',
         'source': 'charlie'
     },
-    'Girona-Liverpool': {
-        'id': '19296291',
-        'source': 'charlie'
-    },
-    'Red Bull Salzburg-Paris Saint-Germain': {
-        'id': '19296296',
-        'source': 'charlie'
-    },
-    'Bayer 04 Leverkusen-Inter': {
-        'id': '19296293',
-        'source': 'charlie'
-    },
-    'RB Leipzig-Young Boys': {
-        'id': '19296295',
-        'source': 'charlie'
-    },
-    'Crvena Zvezda-Manchester City': {
-        'id': '19296289',
+    'Stade Brestois 29-PSV': {
+        'id': '19296294',
         'source': 'charlie'
     }
 }
@@ -75,38 +72,47 @@ def normalize_team_name(name):
     }
     return normalizations.get(name, name)
 
+def debug_stream_search(team1, team2):
+    """Fonction auxiliaire pour le débogage des streams"""
+    debug_info = {
+        'original_teams': f"{team1} vs {team2}",
+        'normalized_teams': f"{normalize_team_name(team1)} vs {normalize_team_name(team2)}",
+        'available_mappings': list(STREAM_MAPPINGS.keys())
+    }
+    
+    app.logger.debug(f"""
+    ====== DEBUG STREAM SEARCH ======
+    Original teams: {debug_info['original_teams']}
+    Normalized teams: {debug_info['normalized_teams']}
+    Available mappings: {debug_info['available_mappings']}
+    ===============================""")
+    
+    return debug_info
+
 def get_stream_url(team1, team2):
-    # Logs détaillés pour le débogage
-    app.logger.info("="*50)
-    app.logger.info(f"Recherche de stream pour: {team1} vs {team2}")
+    debug_info = debug_stream_search(team1, team2)
     
     # Normaliser les noms d'équipes
     team1_norm = normalize_team_name(team1)
     team2_norm = normalize_team_name(team2)
-    
-    app.logger.info(f"Noms normalisés: {team1_norm} vs {team2_norm}")
     
     # Créer toutes les combinaisons possibles
     possible_keys = [
         f"{team1_norm}-{team2_norm}",
         f"{team2_norm}-{team1_norm}",
         f"{team1}-{team2}",
-        f"{team2}-{team1}",
-        f"{team1_norm}-{team2}",
-        f"{team2}-{team1_norm}",
-        f"{team1}-{team2_norm}",
-        f"{team2_norm}-{team1}"
+        f"{team2}-{team1}"
     ]
     
-    app.logger.info(f"Clés possibles: {possible_keys}")
-    app.logger.info(f"Clés disponibles dans STREAM_MAPPINGS: {list(STREAM_MAPPINGS.keys())}")
+    app.logger.debug(f"Trying keys: {possible_keys}")
     
     # Essayer toutes les combinaisons
     for key in possible_keys:
         if key in STREAM_MAPPINGS:
             stream_info = STREAM_MAPPINGS[key]
             url = f"https://embedme.top/embed/{stream_info['source']}/{team1_norm.lower().replace(' ', '-')}-vs-{team2_norm.lower().replace(' ', '-')}-{stream_info['id']}/1"
-            app.logger.info(f"Stream trouvé! URL: {url}")
+            app.logger.debug(f"Match found with key: {key}")
+            app.logger.debug(f"Generated URL: {url}")
             return url
     
     app.logger.warning(f"Aucun stream trouvé pour {team1} vs {team2}")
