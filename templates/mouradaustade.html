@@ -304,6 +304,20 @@
                             <div class="status ${match.status === 'LIVE' ? 'live' : ''}">${match.status}</div>
                             ${hasStream ? '<div class="stream-available">📺 Stream disponible</div>' : ''}
                         </div>
+                        ${match.stream_url ? `
+                            <iframe 
+                                title="${match.team1} vs ${match.team2} Player"
+                                marginheight="0"
+                                marginwidth="0"
+                                src="${match.stream_url}"
+                                scrolling="no"
+                                allowfullscreen="yes"
+                                allow="encrypted-media; picture-in-picture;"
+                                width="100%"
+                                height="100%"
+                                frameborder="0">
+                            </iframe>
+                        ` : '<div class="no-stream">Stream non disponible</div>'}
                     `;
                     matchesDiv.appendChild(matchDiv);
                 });
