@@ -17,11 +17,11 @@ STREAM_SOURCES = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot']
 STREAM_MAPPINGS = {
     'GNK Dinamo Zagreb-Celtic': {
         'id': '19296290',
-        'source': 'charlie'  # ou la source qui fonctionne le mieux
+        'source': 'alpha'
     },
     'Atalanta-Real Madrid': {
         'id': '19296292',
-        'source': 'charlie'
+        'source': 'bravo'
     },
     'Brest-PSV': {
         'id': '19296294',
@@ -61,11 +61,16 @@ def normalize_team_name(name):
     return normalizations.get(name, name)
 
 def get_stream_url(team1, team2):
+    # Ajouter des logs pour le débogage
+    app.logger.info(f"Recherche de stream pour: {team1} vs {team2}")
+    
     # Normaliser les noms d'équipes
     team1_norm = normalize_team_name(team1)
     team2_norm = normalize_team_name(team2)
     
-    # Essayer différentes combinaisons de noms
+    # Log des noms normalisés
+    app.logger.info(f"Noms normalisés: {team1_norm} vs {team2_norm}")
+    
     possible_keys = [
         f"{team1_norm}-{team2_norm}",
         f"{team1}-{team2}",
@@ -73,13 +78,19 @@ def get_stream_url(team1, team2):
         f"{team1}-{team2_norm}"
     ]
     
+    # Log des clés possibles
+    app.logger.info(f"Clés recherchées: {possible_keys}")
+    
     for key in possible_keys:
         if key in STREAM_MAPPINGS:
             stream_info = STREAM_MAPPINGS[key]
             team1_path = team1_norm.lower().replace(' ', '-')
             team2_path = team2_norm.lower().replace(' ', '-')
-            return f"https://embedme.top/embed/{stream_info['source']}/{team1_path}-vs-{team2_path}-{stream_info['id']}/1"
+            url = f"https://embedme.top/embed/{stream_info['source']}/{team1_path}-vs-{team2_path}-{stream_info['id']}/1"
+            app.logger.info(f"URL générée: {url}")
+            return url
     
+    app.logger.warning(f"Aucun stream trouvé pour {team1} vs {team2}")
     return None
 
 def get_cached_data(key, fetch_func):
