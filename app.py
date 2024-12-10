@@ -52,11 +52,18 @@ STREAM_MAPPINGS = {
 def normalize_team_name(name):
     normalizations = {
         'PSV Eindhoven': 'PSV',
-        'Paris SG': 'Paris Saint-Germain',
-        'Inter Milan': 'Inter',
+        'Paris Saint-Germain FC': 'Paris Saint-Germain',
+        'FC Internazionale Milano': 'Inter',
         'Red Star Belgrade': 'Crvena Zvezda',
         'BSC Young Boys': 'Young Boys',
-        # Ajoutez d'autres normalisations si nécessaire
+        'Girona FC': 'Girona',
+        'Atalanta BC': 'Atalanta',
+        'GNK Dinamo Zagreb': 'Dinamo Zagreb',
+        'Celtic FC': 'Celtic',
+        'Real Madrid CF': 'Real Madrid',
+        'FC Red Bull Salzburg': 'Red Bull Salzburg',
+        'RB Leipzig': 'Leipzig',
+        'Stade Brestois 29': 'Brest'
     }
     return normalizations.get(name, name)
 
@@ -71,27 +78,21 @@ def get_stream_url(team1, team2):
     # Log des noms normalisés
     app.logger.info(f"Noms normalisés: {team1_norm} vs {team2_norm}")
     
-    possible_keys = [
-        f"{team1_norm}-{team2_norm}",
-        f"{team1}-{team2}",
-        f"{team1_norm}-{team2}",
-        f"{team1}-{team2_norm}"
-    ]
+    # Essayer les deux ordres possibles
+    key1 = f"{team1_norm}-{team2_norm}"
+    key2 = f"{team2_norm}-{team1_norm}"
     
-    # Log des clés possibles
-    app.logger.info(f"Clés recherchées: {possible_keys}")
+    app.logger.info(f"Clés recherchées: {key1} ou {key2}")
     
-    for key in possible_keys:
-        if key in STREAM_MAPPINGS:
-            stream_info = STREAM_MAPPINGS[key]
-            team1_path = team1_norm.lower().replace(' ', '-')
-            team2_path = team2_norm.lower().replace(' ', '-')
-            url = f"https://embedme.top/embed/{stream_info['source']}/{team1_path}-vs-{team2_path}-{stream_info['id']}/1"
-            app.logger.info(f"URL générée: {url}")
-            return url
-    
-    app.logger.warning(f"Aucun stream trouvé pour {team1} vs {team2}")
-    return None
+    if key1 in STREAM_MAPPINGS:
+        stream_info = STREAM_MAPPINGS[key1]
+    elif key2 in STREAM_MAPPINGS:
+        stream_info = STREAM_MAPPINGS[key2]
+    else:
+        app.logger.warning(f"Aucun stream trouvé pour {team1} vs {team2}")
+        return None
+        
+    return f"https://embedme.top/embed/{stream_info['source']}/{team1_norm.lower().replace(' ', '-')}-vs-{team2_norm.lower().replace(' ', '-')}-{stream_info['id']}/1"
 
 def get_cached_data(key, fetch_func):
     current_time = time.time()
