@@ -13,19 +13,44 @@ CACHE_DURATION = 30  # secondes
 cache = {}
 
 STREAM_MAPPINGS = {
-    'Brest-PSV Eindhoven': '19296294',
+    'Brest-PSV': '19296294',
     'Girona-Liverpool': '19296291',
-    'Red Bull Salzburg-Paris SG': '19296296',
-    'Bayer Leverkusen-Inter Milan': '19296293',
-    'Dinamo Zagreb-Celtic': 'votre_id_existant',
-    'Atalanta-Real Madrid': 'votre_id_existant'
+    'Red Bull Salzburg-Paris Saint-Germain': '19296296',
+    'Bayer 04 Leverkusen-Inter': '19296293',
+    'GNK Dinamo Zagreb-Celtic': '19296290',
+    'Atalanta-Real Madrid': '19296292'
 }
 
+def normalize_team_name(name):
+    normalizations = {
+        'PSV Eindhoven': 'PSV',
+        'Paris SG': 'Paris Saint-Germain',
+        'Inter Milan': 'Inter',
+        # Ajoutez d'autres normalisations si nécessaire
+    }
+    return normalizations.get(name, name)
+
 def get_stream_url(team1, team2):
-    match_key = f"{team1}-{team2}"
-    stream_id = STREAM_MAPPINGS.get(match_key)
-    if stream_id:
-        return f"https://embedme.top/embed/charlie/{team1.lower()}-vs-{team2.lower()}-{stream_id}/1"
+    # Normaliser les noms d'équipes
+    team1_norm = normalize_team_name(team1)
+    team2_norm = normalize_team_name(team2)
+    
+    # Essayer différentes combinaisons de noms
+    possible_keys = [
+        f"{team1_norm}-{team2_norm}",
+        f"{team1}-{team2}",
+        f"{team1_norm}-{team2}",
+        f"{team1}-{team2_norm}"
+    ]
+    
+    for key in possible_keys:
+        if key in STREAM_MAPPINGS:
+            stream_id = STREAM_MAPPINGS[key]
+            # Construire l'URL avec les noms normalisés pour le chemin
+            team1_path = team1_norm.lower().replace(' ', '-')
+            team2_path = team2_norm.lower().replace(' ', '-')
+            return f"https://embedme.top/embed/charlie/{team1_path}-vs-{team2_path}-{stream_id}/1"
+    
     return None
 
 def get_cached_data(key, fetch_func):
@@ -47,39 +72,37 @@ def home():
 
 @app.route('/api/matches/<date>')
 def get_matches(date):
-    app.logger.info(f'Fetching matches for date: {date}')
-    
     def fetch_matches():
         url = "http://api.football-data.org/v4/matches"
-        
         headers = {
-            'X-Auth-Token': '3f9226033c324e538d8d34a36118390b'
+            'X-Auth-Token': os.environ.get('FOOTBALL_API_KEY', '3f9226033c324e538d8d34a36118390b')
         }
         
         try:
             response = requests.get(url, headers=headers)
-            app.logger.info(f'API Response Status: {response.status_code}')
-            
             data = response.json()
-            app.logger.info(f'API Response Data: {data}')
-            
             all_matches = []
+            
             if 'matches' in data:
                 for match in data['matches']:
+                    team1 = match['homeTeam']['name']
+                    team2 = match['awayTeam']['name']
+                    stream_url = get_stream_url(team1, team2)
+                    
                     match_info = {
-                        'team1': match['homeTeam']['name'],
-                        'team2': match['awayTeam']['name'],
+                        'team1': team1,
+                        'team2': team2,
                         'team1_logo': match['homeTeam'].get('crest', ''),
                         'team2_logo': match['awayTeam'].get('crest', ''),
                         'time': datetime.strptime(match['utcDate'], '%Y-%m-%dT%H:%M:%SZ').strftime('%H:%M'),
                         'status': match['status'],
                         'score': f"{match['score']['fullTime']['home'] if match['score']['fullTime']['home'] is not None else '-'}-{match['score']['fullTime']['away'] if match['score']['fullTime']['away'] is not None else '-'}",
                         'competition': match['competition']['name'],
-                        'stream_url': get_stream_url(match['homeTeam']['name'], match['awayTeam']['name'])
+                        'stream_url': stream_url,
+                        'has_stream': bool(stream_url)
                     }
                     all_matches.append(match_info)
             
-            app.logger.info(f'Processed {len(all_matches)} matches')
             return all_matches
             
         except Exception as e:
