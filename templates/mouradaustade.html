@@ -219,27 +219,13 @@
                 }
                 
                 matches.forEach(match => {
+                    console.log('Match:', match.team1, 'vs', match.team2, 'has_stream:', match.has_stream);
+                    
                     const matchDiv = document.createElement('div');
-                    matchDiv.className = 'match-card';
+                    matchDiv.className = match.has_stream ? 'match-card has-stream' : 'match-card';
                     
-                    // Utiliser la propriété has_stream du backend
-                    if (match.has_stream) {
-                        matchDiv.classList.add('has-stream');
-                    }
-                    
-                    // Modifier l'événement onclick pour utiliser l'URL du stream du backend
-                    matchDiv.onclick = () => {
-                        if (match.stream_url) {
-                            const modal = document.getElementById('streamModal');
-                            const iframe = document.getElementById('streamIframe');
-                            iframe.src = match.stream_url;
-                            modal.style.display = 'block';
-                        } else {
-                            alert('Stream non disponible pour ce match');
-                        }
-                    };
-                    
-                    matchDiv.innerHTML = `
+                    // Créer le contenu HTML
+                    const matchContent = `
                         <div class="match-header">
                             <div class="team">
                                 <img src="${match.team1_logo}" class="team-logo" alt="${match.team1}">
@@ -258,11 +244,32 @@
                             ${match.has_stream ? '<div class="stream-available">📺 Stream disponible</div>' : ''}
                         </div>
                     `;
+                    
+                    matchDiv.innerHTML = matchContent;
+                    
+                    // Ajouter l'événement click seulement si le stream est disponible
+                    if (match.has_stream) {
+                        matchDiv.addEventListener('click', () => {
+                            const modal = document.getElementById('streamModal');
+                            const iframe = document.getElementById('streamIframe');
+                            iframe.src = match.stream_url;
+                            modal.style.display = 'block';
+                        });
+                    }
+                    
                     matchesDiv.appendChild(matchDiv);
                 });
             } catch (error) {
                 console.error('Error loading matches:', error);
             }
+        }
+
+        // Fonction pour fermer le modal
+        function closeStream() {
+            const modal = document.getElementById('streamModal');
+            const iframe = document.getElementById('streamIframe');
+            iframe.src = '';
+            modal.style.display = 'none';
         }
 
         window.onload = loadMatches;
