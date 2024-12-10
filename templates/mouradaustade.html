@@ -7,6 +7,8 @@
     <meta name="description" content="Regardez les matchs de football en direct sur Mourad Au Stade">
     <meta name="google-site-verification" content="VOTRE_CODE_DE_VERIFICATION">
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9547009217122053" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cookieconsent@3/build/cookieconsent.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cookieconsent@3/build/cookieconsent.min.css">
     <style>
         * {
             margin: 0;
@@ -277,6 +279,52 @@
 
         window.onload = loadMatches;
         setInterval(loadMatches, 60000);
+    </script>
+    <script>
+    window.addEventListener("load", function(){
+    window.cookieconsent.initialise({
+      "palette": {
+        "popup": {
+          "background": "#1e3c72",
+          "text": "#ffffff"
+        },
+        "button": {
+          "background": "#4CAF50",
+          "text": "#ffffff"
+        }
+      },
+      "type": "opt-in",
+      "content": {
+        "message": "Ce site utilise des cookies et des technologies similaires pour personnaliser le contenu, analyser le trafic et fournir des publicités personnalisées.",
+        "dismiss": "Refuser",
+        "allow": "Accepter",
+        "link": "En savoir plus",
+        "href": "/privacy-policy",
+        "policy": "Politique de cookies"
+      },
+      "cookie": {
+        "name": "almala3ib_consent",
+        "domain": "almala3ib.onrender.com"
+      },
+      onInitialise: function (status) {
+        var type = this.options.type;
+        var didConsent = this.hasConsented();
+        if (didConsent) {
+          // enable cookies
+        }
+      },
+      onStatusChange: function(status, chosenBefore) {
+        var type = this.options.type;
+        var didConsent = this.hasConsented();
+        if (didConsent) {
+          // enable cookies
+        }
+      },
+      onRevokeChoice: function() {
+        var type = this.options.type;
+        // disable cookies
+      }
+    })});
     </script>
 </head>
 <body>
