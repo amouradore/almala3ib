@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, Response
 from flask_cors import CORS
 import requests
 from datetime import datetime
@@ -227,6 +227,31 @@ def test_api():
 @app.route('/privacy-policy')
 def privacy_policy():
     return render_template('privacy.html')
+
+@app.route('/robots.txt')
+def robots():
+    return """
+User-agent: *
+Allow: /
+Sitemap: https://almala3ib.onrender.com/sitemap.xml
+"""
+
+@app.route('/sitemap.xml')
+def sitemap():
+    return Response("""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+        <loc>https://almala3ib.onrender.com/</loc>
+        <changefreq>daily</changefreq>
+        <priority>1.0</priority>
+    </url>
+    <url>
+        <loc>https://almala3ib.onrender.com/privacy-policy</loc>
+        <changefreq>monthly</changefreq>
+        <priority>0.8</priority>
+    </url>
+</urlset>
+""", mimetype='application/xml')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))  # Render utilise généralement le port 10000
