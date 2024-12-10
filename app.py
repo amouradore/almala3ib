@@ -24,15 +24,7 @@ STREAM_MAPPINGS = {
         'id': '19296290',
         'source': 'alpha'
     },
-    'GNK Dinamo Zagreb-Celtic FC': {
-        'id': '19296290',
-        'source': 'alpha'
-    },
     'Girona-Liverpool': {
-        'id': '19296291',
-        'source': 'charlie'
-    },
-    'Girona FC-Liverpool FC': {
         'id': '19296291',
         'source': 'charlie'
     },
@@ -40,35 +32,61 @@ STREAM_MAPPINGS = {
         'id': '19296292',
         'source': 'bravo'
     },
-    'Atalanta BC-Real Madrid CF': {
-        'id': '19296292',
-        'source': 'bravo'
-    },
     'Brest-PSV': {
         'id': '19296294',
         'source': 'charlie'
     },
-    'Stade Brestois 29-PSV': {
-        'id': '19296294',
-        'source': 'charlie'
+    'Salzburg-PSG': {
+        'id': '19296295',
+        'source': 'delta'
+    },
+    'Shakhtar Donetsk-Bayern Munich': {
+        'id': '19296296',
+        'source': 'echo'
+    },
+    'Leipzig-Aston Villa': {
+        'id': '19296297',
+        'source': 'foxtrot'
+    },
+    'Club Brugge-Sporting CP': {
+        'id': '19296298',
+        'source': 'alpha'
     }
 }
 
 def normalize_team_name(name):
+    """Normalise les noms d'équipes"""
     normalizations = {
         'PSV Eindhoven': 'PSV',
-        'Paris Saint-Germain FC': 'Paris Saint-Germain',
+        'Paris Saint-Germain FC': 'PSG',
         'FC Internazionale Milano': 'Inter',
-        'Red Star Belgrade': 'Crvena Zvezda',
-        'BSC Young Boys': 'Young Boys',
+        'FC Bayern München': 'Bayern Munich',
         'Girona FC': 'Girona',
+        'Liverpool FC': 'Liverpool',
         'Atalanta BC': 'Atalanta',
+        'Real Madrid CF': 'Real Madrid',
         'GNK Dinamo Zagreb': 'Dinamo Zagreb',
         'Celtic FC': 'Celtic',
-        'Real Madrid CF': 'Real Madrid',
-        'FC Red Bull Salzburg': 'Red Bull Salzburg',
+        'Stade Brestois 29': 'Brest',
         'RB Leipzig': 'Leipzig',
-        'Stade Brestois 29': 'Brest'
+        'FC Red Bull Salzburg': 'Salzburg',
+        'Sporting Clube de Portugal': 'Sporting CP',
+        'Club Brugge KV': 'Club Brugge',
+        'FK Shakhtar Donetsk': 'Shakhtar Donetsk',
+        'Leeds United FC': 'Leeds',
+        'Middlesbrough FC': 'Middlesbrough',
+        'Portsmouth FC': 'Portsmouth',
+        'Norwich City FC': 'Norwich',
+        'Sunderland AFC': 'Sunderland',
+        'Bristol City FC': 'Bristol City',
+        'Luton Town FC': 'Luton',
+        'Stoke City FC': 'Stoke City',
+        'Burnley FC': 'Burnley',
+        'Derby County FC': 'Derby County',
+        'Plymouth Argyle FC': 'Plymouth',
+        'Swansea City AFC': 'Swansea',
+        'Sheffield Wednesday FC': 'Sheffield Wednesday',
+        'Blackburn Rovers FC': 'Blackburn'
     }
     return normalizations.get(name, name)
 
@@ -96,15 +114,13 @@ def get_stream_url(team1, team2):
     team1_norm = normalize_team_name(team1)
     team2_norm = normalize_team_name(team2)
     
-    # Créer toutes les combinaisons possibles
+    # Créer toutes les combinaisons possibles avec les noms normalisés
     possible_keys = [
         f"{team1_norm}-{team2_norm}",
-        f"{team2_norm}-{team1_norm}",
-        f"{team1}-{team2}",
-        f"{team2}-{team1}"
+        f"{team2_norm}-{team1_norm}"
     ]
     
-    app.logger.debug(f"Trying keys: {possible_keys}")
+    app.logger.debug(f"Trying normalized keys: {possible_keys}")
     
     # Essayer toutes les combinaisons
     for key in possible_keys:
