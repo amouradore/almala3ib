@@ -224,6 +224,10 @@ def test_api():
             'error': str(e)
         })
 
+@app.route('/privacy-policy')
+def privacy_policy():
+    return render_template('privacy.html')
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))  # Render utilise généralement le port 10000
     app.run(host='0.0.0.0', port=port)
