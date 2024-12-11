@@ -242,226 +242,163 @@
         }
     </style>
     <script>
+        // Configuration globale
         const CONFIG = {
-            ENDPOINTS: {
-                PRIMARY: 'https://almala3ib.onrender.com',
-                BACKUP: 'https://backup-server.com',  // À configurer avec votre serveur de backup
-                LOCAL: '/local'  // Fallback local
+            SELECTORS: {
+                MATCHES_CONTAINER: '.matches-grid',
+                STREAM_CONTAINER: '.player-container',
+                STREAM_IFRAME: '#streamIframe'
             },
-            RETRY: {
-                MAX_ATTEMPTS: 2,
-                DELAY: 2000
+            API: {
+                BASE_URL: window.location.origin,
+                ENDPOINTS: {
+                    MATCHES: '/api/matches',
+                    STREAM: '/api/stream'
+                }
             }
         };
 
-        // Gestionnaire de serveur avec fallback
-        class ServerManager {
+        // Classe principale de l'application
+        class MatchesApp {
             constructor() {
-                this.currentServer = CONFIG.ENDPOINTS.PRIMARY;
-                this.failureCount = 0;
+                this.matchesContainer = document.querySelector(CONFIG.SELECTORS.MATCHES_CONTAINER);
+                this.init();
             }
 
-            async request(path, options = {}) {
+            init() {
+                if (!this.matchesContainer) {
+                    console.error('Container des matches non trouvé');
+                    return;
+                }
+
+                this.loadMatches();
+                this.setupRefresh();
+            }
+
+            setupRefresh() {
+                // Rafraîchir les données toutes les minutes si la page est visible
+                setInterval(() => {
+                    if (document.visibilityState === 'visible') {
+                        this.loadMatches();
+                    }
+                }, 60000);
+            }
+
+            async loadMatches() {
                 try {
-                    const response = await this.tryRequest(path, options);
-                    this.failureCount = 0; // Réinitialiser le compteur en cas de succès
-                    return response;
+                    this.showLoading();
+                    const matches = await this.fetchMatches();
+                    
+                    if (!matches || matches.length === 0) {
+                        this.showNoMatches();
+                        return;
+                    }
+
+                    this.displayMatches(matches);
+
                 } catch (error) {
-                    console.warn(`Erreur serveur (${this.currentServer}):`, error);
+                    console.error('Erreur de chargement:', error);
+                    this.showError();
+                }
+            }
+
+            async fetchMatches() {
+                try {
+                    const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.MATCHES}`);
                     
-                    if (error.message.includes('502')) {
-                        await this.handleServerFailure();
-                        // Réessayer avec le nouveau serveur
-                        return this.request(path, options);
+                    if (response.status === 404) {
+                        return this.getFallbackMatches();
                     }
-                    
-                    throw error;
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    return await response.json();
+
+                } catch (error) {
+                    console.warn('Erreur API:', error);
+                    return this.getFallbackMatches();
                 }
             }
 
-            async tryRequest(path, options) {
-                const response = await fetch(`${this.currentServer}${path}`, {
-                    ...options,
-                    headers: {
-                        'Accept': 'application/json',
-                        ...options.headers
+            getFallbackMatches() {
+                // Données de repli en cas d'erreur
+                return [
+                    {
+                        id: 'demo1',
+                        homeTeam: 'Pas de matches disponibles',
+                        awayTeam: 'pour le moment',
+                        status: 'unavailable',
+                        has_stream: false
                     }
-                });
-
-                if (response.status === 502) {
-                    throw new Error('502_BAD_GATEWAY');
-                }
-
-                if (!response.ok) {
-                    throw new Error(`HTTP_${response.status}`);
-                }
-
-                return response.json();
+                ];
             }
 
-            async handleServerFailure() {
-                this.failureCount++;
-                
-                // Basculer vers le serveur de backup après plusieurs échecs
-                if (this.failureCount >= 2) {
-                    if (this.currentServer === CONFIG.ENDPOINTS.PRIMARY) {
-                        console.log('Basculement vers le serveur de backup...');
-                        this.currentServer = CONFIG.ENDPOINTS.BACKUP;
-                    } else if (this.currentServer === CONFIG.ENDPOINTS.BACKUP) {
-                        console.log('Basculement vers le mode local...');
-                        this.currentServer = CONFIG.ENDPOINTS.LOCAL;
-                    }
-                    this.failureCount = 0;
+            showLoading() {
+                if (this.matchesContainer) {
+                    this.matchesContainer.innerHTML = `
+                        <div class="loading-state">
+                            <p>Chargement des matches...</p>
+                        </div>
+                    `;
                 }
-
-                // Attendre avant de réessayer
-                await new Promise(resolve => setTimeout(resolve, CONFIG.RETRY.DELAY));
             }
-        }
 
-        // Instance globale du gestionnaire de serveur
-        const serverManager = new ServerManager();
-
-        // Vérification de l'existence des éléments DOM
-        function ensureElement(selector) {
-            const element = document.querySelector(selector);
-            if (!element) {
-                console.error(`Élément non trouvé: ${selector}`);
-                return null;
+            showError() {
+                if (this.matchesContainer) {
+                    this.matchesContainer.innerHTML = `
+                        <div class="error-state">
+                            <p>Impossible de charger les matches</p>
+                            <button onclick="app.loadMatches()" class="retry-button">
+                                Réessayer
+                            </button>
+                        </div>
+                    `;
+                }
             }
-            return element;
-        }
 
-        // Gestionnaire principal des requêtes API
-        async function apiRequest(endpoint, options = {}) {
-            const url = `${CONFIG.ENDPOINTS.BASE_URL}${endpoint}`;
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-            try {
-                const response = await fetch(url, {
-                    ...options,
-                    signal: controller.signal,
-                    headers: {
-                        'Accept': 'application/json',
-                        ...options.headers
-                    }
-                });
-
-                clearTimeout(timeoutId);
-
-                // Vérification du type de contenu
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    throw new Error('INVALID_RESPONSE');
+            showNoMatches() {
+                if (this.matchesContainer) {
+                    this.matchesContainer.innerHTML = `
+                        <div class="no-matches-state">
+                            <p>Aucun match disponible pour le moment</p>
+                        </div>
+                    `;
                 }
+            }
 
-                if (!response.ok) {
-                    throw new Error(response.status === 404 ? 'NOT_FOUND' : 
-                                  response.status === 502 ? 'SERVICE_UNAVAILABLE' : 
-                                  `HTTP_ERROR_${response.status}`);
-                }
+            displayMatches(matches) {
+                if (!this.matchesContainer) return;
 
-                return await response.json();
-
-            } catch (error) {
-                console.warn(`Erreur API (${endpoint}):`, error.message);
-                throw error;
-            } finally {
-                clearTimeout(timeoutId);
+                this.matchesContainer.innerHTML = matches.map(match => `
+                    <div class="match-card" data-match-id="${match.id || ''}">
+                        <div class="match-info">
+                            <h3>${match.homeTeam} vs ${match.awayTeam}</h3>
+                            <p class="match-status ${match.status || 'unknown'}">${match.status || 'Status inconnu'}</p>
+                            <p class="stream-status ${match.has_stream ? 'available' : 'unavailable'}">
+                                ${match.has_stream ? 'Stream disponible' : 'Stream indisponible'}
+                            </p>
+                        </div>
+                    </div>
+                `).join('');
             }
         }
 
         // Initialisation sécurisée
-        function initializeApp() {
-            const matchesGrid = ensureElement(CONFIG.SELECTORS.MATCHES_GRID);
-            if (!matchesGrid) {
-                console.error('Container des matches non trouvé');
-                return;
-            }
-
-            // Créer le container s'il n'existe pas
-            if (!matchesGrid) {
-                const container = document.createElement('div');
-                container.className = 'matches-grid';
-                document.body.appendChild(container);
-            }
-
-            loadMatches();
-        }
-
-        // Fonction de chargement des matches avec gestion d'erreur améliorée
-        async function loadMatches() {
-            const container = document.querySelector('.matches-grid');
-            if (!container) return;
-
-            try {
-                container.innerHTML = '<div class="loading">Chargement des matches...</div>';
-                
-                let matches;
-                try {
-                    matches = await serverManager.request('/api/matches');
-                } catch (error) {
-                    // En cas d'échec total, utiliser des données locales de démonstration
-                    matches = getDemoMatches();
-                }
-
-                displayMatches(matches, container);
-
-            } catch (error) {
-                showError(container, 'Service temporairement indisponible. Veuillez réessayer plus tard.');
+        let app;
+        function initApp() {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => {
+                    app = new MatchesApp();
+                });
+            } else {
+                app = new MatchesApp();
             }
         }
 
-        // Données de démonstration pour le mode hors-ligne
-        function getDemoMatches() {
-            // Implémentation des données locales de démonstration
-        }
-
-        // Attendre que le DOM soit complètement chargé
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initializeApp);
-        } else {
-            initializeApp();
-        }
-
-        // Fonctions utilitaires
-        function showError(container, message) {
-            if (!container) return;
-            
-            container.innerHTML = `
-                <div class="error-state">
-                    <p>${message}</p>
-                    <button onclick="retryLoad()" class="retry-button">
-                        Réessayer
-                    </button>
-                </div>
-            `;
-        }
-
-        function retryLoad() {
-            loadMatches();
-        }
-
-        function displayMatches(matches, container) {
-            if (!container) return;
-
-            if (!matches || matches.length === 0) {
-                container.innerHTML = '<div class="no-matches">Aucun match disponible</div>';
-                return;
-            }
-
-            container.innerHTML = matches.map(match => `
-                <div class="match-card" data-match-id="${match.id}">
-                    <div class="match-info">
-                        <h3>${match.homeTeam} vs ${match.awayTeam}</h3>
-                        <p class="stream-status ${match.has_stream ? 'available' : 'unavailable'}">
-                            ${match.has_stream ? 'Stream disponible' : 'Stream indisponible'}
-                        </p>
-                    </div>
-                </div>
-            `).join('');
-        }
+        // Démarrage de l'application
+        initApp();
 
         // Fonction pour fermer le modal
         function closeStream() {
@@ -471,8 +408,8 @@
             modal.style.display = 'none';
         }
 
-        window.onload = loadMatches;
-        setInterval(loadMatches, 60000);
+        window.onload = app.loadMatches;
+        setInterval(app.loadMatches, 60000);
 
         window.addEventListener('load', function() {
             setTimeout(() => {
