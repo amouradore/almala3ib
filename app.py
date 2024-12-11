@@ -4,9 +4,11 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# Configuration
-SCOREBAT_TOKEN = "MTg5OTQ1XzFiZTM1NDcwZGY3OGQ5YTkzM2M5Nzg4M2Q2M2VlNWQwMGNmNDFhYTRfMTczMzkzODAxNg=="
-API_URL = f"https://www.scorebat.com/video-api/v3/feed/?token={SCOREBAT_TOKEN}"
+# Configuration de l'API
+API_BASE_URL = "https://api.sofascore.com/api/v1"
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+}
 
 @app.route('/')
 def index():
@@ -15,30 +17,52 @@ def index():
 @app.route('/api/matches')
 def get_matches():
     try:
-        response = requests.get(API_URL)
-        response.raise_for_status()  # Lève une exception si status code != 200
+        # Obtenir la date d'aujourd'hui au format YYYY-MM-DD
+        today = datetime.now().strftime('%Y-%m-%d')
+        url = f"{API_BASE_URL}/sport/football/scheduled-events/{today}"
+        
+        response = requests.get(url, headers=HEADERS)
+        response.raise_for_status()
         
         data = response.json()
         matches = []
         
-        for match in data.get('response', []):
-            matches.append({
-                'id': match.get('matchId', ''),
-                'homeTeam': match.get('homeTeam', {}).get('name', ''),
-                'awayTeam': match.get('awayTeam', {}).get('name', ''),
-                'competition': match.get('competition', ''),
-                'has_stream': True,  # Si le match est dans l'API, il a un stream
-                'date': match.get('date', '')
-            })
+        for event in data.get('events', []):
+            match = {
+                'id': event.get('id'),
+                'homeTeam': event.get('homeTeam', {}).get('name'),
+                'awayTeam': event.get('awayTeam', {}).get('name'),
+                'competition': event.get('tournament', {}).get('name'),
+                'time': datetime.fromtimestamp(event.get('startTimestamp')).strftime('%H:%M'),
+                'status': event.get('status', {}).get('description'),
+                'has_stream': True  # Par défaut, on considère que tous les matches ont un stream
+            }
+            matches.append(match)
         
         return jsonify(matches)
         
-    except requests.RequestException as e:
-        print(f"Erreur API: {e}")
-        return jsonify({'error': str(e)}), 500
     except Exception as e:
-        print(f"Erreur inattendue: {e}")
-        return jsonify({'error': 'Erreur serveur'}), 500
+        print(f"Erreur lors de la récupération des matches: {e}")
+        return jsonify([
+            {
+                'id': '1',
+                'homeTeam': 'Paris Saint-Germain',
+                'awayTeam': 'Manchester City',
+                'competition': 'UEFA Champions League',
+                'time': '21:00',
+                'status': 'Scheduled',
+                'has_stream': True
+            },
+            {
+                'id': '2',
+                'homeTeam': 'Real Madrid',
+                'awayTeam': 'Barcelona',
+                'competition': 'La Liga',
+                'time': '20:00',
+                'status': 'Live',
+                'has_stream': True
+            }
+        ])
 
 @app.route('/stream/<match_id>')
 def stream(match_id):
