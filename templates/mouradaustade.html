@@ -244,11 +244,11 @@
     <script>
         const CONFIG = {
             API_ENDPOINTS: {
-                PRIMARY: 'https://almala3ib.onrender.com/',
-                BACKUP: 'https://backup-stream-server.com/',  // Serveur de secours
+                MATCHES: '/api/matches',
+                STREAM: '/api/stream',
             },
-            RETRY_ATTEMPTS: 3,
-            RETRY_DELAY: 2000, // 2 secondes
+            RETRY_ATTEMPTS: 2,
+            RETRY_DELAY: 1000,
         };
 
         async function fetchWithRetry(url, attempts = CONFIG.RETRY_ATTEMPTS) {
@@ -309,52 +309,29 @@
         });
 
         async function loadMatches() {
-            const API_URL = 'https://almala3ib.onrender.com/api/matches';
-            const FALLBACK_URL = '/local/matches'; // URL de repli locale
-
+            const matchesDiv = document.querySelector('.matches-grid');
+            
             try {
-                // Première tentative avec l'API principale
-                const response = await fetch(API_URL);
-                
-                // Vérification du type de contenu
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    throw new Error('Format de réponse invalide');
+                // Charger les matches depuis le cache d'abord
+                const cachedMatches = getCachedMatches();
+                if (cachedMatches) {
+                    displayMatches(cachedMatches);
                 }
 
-                // Vérification du statut HTTP
+                // Tenter de charger les données fraîches
+                const response = await fetch(CONFIG.API_ENDPOINTS.MATCHES);
                 if (!response.ok) {
-                    if (response.status === 404) {
-                        console.warn('API endpoint non trouvé, utilisation des données locales');
-                        return await fetchLocalMatches();
-                    }
-                    throw new Error(`Erreur HTTP: ${response.status}`);
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
-
+                
                 const matches = await response.json();
+                cacheMatches(matches);
                 displayMatches(matches);
 
             } catch (error) {
-                console.error('Erreur de chargement des matches:', error);
-                
-                // Affichage d'un message d'erreur utilisateur
-                const matchesDiv = document.querySelector('.matches-grid');
-                matchesDiv.innerHTML = `
-                    <div class="error-state">
-                        <h3>Impossible de charger les matches</h3>
-                        <p>Nous rencontrons des difficultés techniques. Veuillez réessayer plus tard.</p>
-                        <button onclick="loadMatches()" class="retry-button">
-                            Réessayer
-                        </button>
-                    </div>
-                `;
-
-                // Tentative de chargement des données locales
-                try {
-                    const localMatches = await fetchLocalMatches();
-                    displayMatches(localMatches);
-                } catch (fallbackError) {
-                    console.error('Échec du chargement des données locales:', fallbackError);
+                console.warn('Erreur de chargement des matches:', error);
+                if (!getCachedMatches()) {
+                    displayError(matchesDiv, 'Impossible de charger les matches');
                 }
             }
         }
@@ -417,6 +394,84 @@
                 (adsbygoogle = window.adsbygoogle || []).push({});
             });
         }
+
+        // Fonction de chargement du stream
+        async function loadStream(matchId) {
+            const playerContainer = document.querySelector('.player-container');
+            
+            try {
+                const streamUrl = await getStreamUrl(matchId);
+                if (!streamUrl) {
+                    throw new Error('Stream non disponible');
+                }
+
+                const iframe = document.getElementById('streamIframe');
+                iframe.src = streamUrl;
+                
+            } catch (error) {
+                console.warn('Erreur de chargement du stream:', error);
+                displayError(playerContainer, 'Stream temporairement indisponible');
+            }
+        }
+
+        // Fonctions utilitaires
+        function displayError(container, message) {
+            container.innerHTML = `
+                <div class="error-state">
+                    <p>${message}</p>
+                    <button onclick="window.location.reload()" class="retry-button">
+                        Réessayer
+                    </button>
+                </div>
+            `;
+        }
+
+        function getCachedMatches() {
+            const cached = localStorage.getItem('matches');
+            if (!cached) return null;
+            
+            try {
+                const { data, timestamp } = JSON.parse(cached);
+                // Vérifier si le cache est récent (moins de 5 minutes)
+                if (Date.now() - timestamp < 5 * 60 * 1000) {
+                    return data;
+                }
+            } catch (e) {
+                localStorage.removeItem('matches');
+            }
+            return null;
+        }
+
+        function cacheMatches(matches) {
+            localStorage.setItem('matches', JSON.stringify({
+                data: matches,
+                timestamp: Date.now()
+            }));
+        }
+
+        async function getStreamUrl(matchId) {
+            try {
+                const response = await fetch(`${CONFIG.API_ENDPOINTS.STREAM}/${matchId}`);
+                if (!response.ok) return null;
+                const data = await response.json();
+                return data.streamUrl;
+            } catch {
+                return null;
+            }
+        }
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', () => {
+            loadMatches();
+            
+            // Gestionnaire d'événements pour les cartes de match
+            document.querySelector('.matches-grid').addEventListener('click', (e) => {
+                const matchCard = e.target.closest('.match-card');
+                if (matchCard && matchCard.dataset.matchId) {
+                    loadStream(matchCard.dataset.matchId);
+                }
+            });
+        });
     </script>
     <script>
     window.addEventListener("load", function(){
@@ -523,7 +578,7 @@
                         // Gestion des erreurs de chargement
                         streamIframe.onerror = function() {
                             console.error('Erreur de chargement du stream');
-                            // Afficher un message d'erreur à l'utilisateur
+                            // Afficher un message d'erreur �� l'utilisateur
                             showErrorMessage('Le stream n\'est pas disponible pour le moment');
                         };
 
