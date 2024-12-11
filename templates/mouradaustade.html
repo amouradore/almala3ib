@@ -242,129 +242,81 @@
         }
     </style>
     <script>
-        // Configuration
+        // Configuration simple
         const APP_CONFIG = {
             container: '.matches-grid',
-            api: '/api/matches',
-            refreshInterval: 60000
+            api: 'https://api.footballdata.org/v4/matches', // API des vrais matches
+            headers: {
+                'X-Auth-Token': 'YOUR_API_KEY' // Votre clé API
+            }
         };
 
-        // Données de démonstration pour quand l'API n'est pas disponible
-        const DEMO_MATCHES = [
-            {
-                id: '1',
-                homeTeam: 'Paris Saint-Germain',
-                awayTeam: 'Manchester City',
-                competition: 'UEFA Champions League',
-                time: '21:00',
-                status: 'upcoming',
-                has_stream: true
-            },
-            {
-                id: '2',
-                homeTeam: 'Real Madrid',
-                awayTeam: 'Barcelona',
-                competition: 'La Liga',
-                time: '20:00',
-                status: 'live',
-                has_stream: true
-            }
-        ];
-
-        // Chargement des matches
+        // Chargement des matches du jour
         async function loadMatches(container) {
             try {
                 showLoading(container);
-                let matches = await fetchMatches();
-                
-                // Utiliser les matches de démo si l'API ne renvoie rien
-                if (!matches || matches.length === 0) {
-                    matches = DEMO_MATCHES;
-                }
-                
+                const matches = await fetchTodayMatches();
                 displayMatches(container, matches);
             } catch (error) {
                 console.error('Erreur:', error);
-                // En cas d'erreur, afficher les matches de démo
-                displayMatches(container, DEMO_MATCHES);
+                showError(container);
             }
         }
 
+        // Récupération des matches du jour
+        async function fetchTodayMatches() {
+            const today = new Date().toISOString().split('T')[0];
+            const url = `${APP_CONFIG.api}?date=${today}`;
+            
+            try {
+                const response = await fetch(url, {
+                    headers: APP_CONFIG.headers
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                return data.matches || [];
+            } catch (error) {
+                console.warn('Erreur API:', error);
+                return [];
+            }
+        }
+
+        // Affichage des matches
         function displayMatches(container, matches) {
             if (!matches || matches.length === 0) {
-                container.innerHTML = `
-                    <div class="no-matches">
-                        <p>Aucun match disponible pour le moment</p>
-                    </div>`;
+                container.innerHTML = '<div class="no-matches">Aucun match disponible</div>';
                 return;
             }
 
             container.innerHTML = matches.map(match => `
-                <div class="match-card ${match.has_stream ? 'has-stream' : ''}" data-match-id="${match.id}">
-                    <div class="match-header">
-                        <div class="team">
-                            <img src="/img/teams/${match.homeTeam.toLowerCase().replace(/\s+/g, '')}.png" 
-                                 class="team-logo" 
-                                 alt="${match.homeTeam}"
-                                 onerror="this.src='/img/default-team.png'">
-                            <span class="team-name">${match.homeTeam}</span>
-                        </div>
-                        <div class="score">VS</div>
-                        <div class="team">
-                            <img src="/img/teams/${match.awayTeam.toLowerCase().replace(/\s+/g, '')}.png" 
-                                 class="team-logo" 
-                                 alt="${match.awayTeam}"
-                                 onerror="this.src='/img/default-team.png'">
-                            <span class="team-name">${match.awayTeam}</span>
-                        </div>
-                    </div>
+                <div class="match-card">
                     <div class="match-info">
-                        <span class="competition">${match.competition || ''}</span>
-                        <span class="time">${match.time || ''}</span>
-                        <span class="status ${match.status}">${getStatusText(match.status)}</span>
-                        ${match.has_stream ? '<span class="stream-available">Stream disponible</span>' : ''}
+                        <h3>${match.homeTeam} vs ${match.awayTeam}</h3>
+                        <p class="stream-status ${match.has_stream ? 'available' : 'unavailable'}">
+                            ${match.has_stream ? 'Stream disponible' : 'Stream indisponible'}
+                        </p>
                     </div>
                 </div>
             `).join('');
-
-            // Ajouter les écouteurs d'événements pour les streams
-            addStreamListeners(container);
-        }
-
-        function getStatusText(status) {
-            const statusMap = {
-                'live': 'EN DIRECT',
-                'upcoming': 'À VENIR',
-                'finished': 'TERMINÉ'
-            };
-            return statusMap[status] || status;
         }
 
         function showLoading(container) {
+            container.innerHTML = '<div class="loading">Chargement des matches...</div>';
+        }
+
+        function showError(container) {
             container.innerHTML = `
-                <div class="loading">
-                    <p>Chargement des matches...</p>
-                </div>`;
-        }
-
-        function addStreamListeners(container) {
-            const cards = container.querySelectorAll('.match-card.has-stream');
-            cards.forEach(card => {
-                card.addEventListener('click', () => {
-                    const matchId = card.dataset.matchId;
-                    if (matchId) {
-                        openStream(matchId);
-                    }
-                });
-            });
-        }
-
-        function openStream(matchId) {
-            const modal = document.getElementById('streamModal');
-            if (modal) {
-                modal.style.display = 'block';
-                loadStream(matchId);
-            }
+                <div class="error-state">
+                    <p>Impossible de charger les matches</p>
+                    <button onclick="loadMatches(document.querySelector('${APP_CONFIG.container}'))">
+                        Réessayer
+                    </button>
+                </div>
+            `;
         }
 
         // Initialisation
@@ -374,12 +326,12 @@
 
             loadMatches(container);
 
-            // Rafraîchissement périodique
+            // Rafraîchissement toutes les minutes
             setInterval(() => {
                 if (document.visibilityState === 'visible') {
                     loadMatches(container);
                 }
-            }, APP_CONFIG.refreshInterval);
+            }, 60000);
         }
 
         // Démarrage
