@@ -244,58 +244,29 @@
     <script>
         async function loadMatches() {
             try {
-                const today = new Date().toISOString().split('T')[0];
-                const response = await fetch(`/api/matches/${today}`);
+                const response = await fetch('/api/matches');
                 const matches = await response.json();
-                
                 const matchesDiv = document.querySelector('.matches-grid');
                 matchesDiv.innerHTML = '';
-                
-                if (matches.length === 0) {
-                    matchesDiv.innerHTML = '<p class="no-matches">Aucun match disponible pour aujourd\'hui</p>';
-                    return;
-                }
-                
+
                 matches.forEach(match => {
-                    console.log('Match:', match.team1, 'vs', match.team2, 'has_stream:', match.has_stream);
-                    
+                    if (!match.has_stream) {
+                        console.log(`Match: ${match.homeTeam} vs ${match.awayTeam} has_stream: false`);
+                        return; // Skip matches without streams
+                    }
+
                     const matchDiv = document.createElement('div');
-                    matchDiv.className = match.has_stream ? 'match-card has-stream' : 'match-card';
-                    
-                    // Créer le contenu HTML
-                    const matchContent = `
-                        <div class="match-header">
-                            <div class="team">
-                                <img src="${match.team1_logo}" class="team-logo" alt="${match.team1}">
-                                <span class="team-name">${match.team1}</span>
-                            </div>
-                            <div class="score">${match.score}</div>
-                            <div class="team">
-                                <img src="${match.team2_logo}" class="team-logo" alt="${match.team2}">
-                                <span class="team-name">${match.team2}</span>
-                            </div>
-                        </div>
+                    matchDiv.className = 'match-card';
+                    matchDiv.innerHTML = `
                         <div class="match-info">
-                            <div class="competition">${match.competition}</div>
-                            <div class="time">${match.time}</div>
-                            <div class="status ${match.status === 'LIVE' ? 'live' : ''}">${match.status}</div>
-                            ${match.has_stream ? '<div class="stream-available">📺 Stream disponible</div>' : ''}
+                            <h3>${match.homeTeam} vs ${match.awayTeam}</h3>
+                            <p class="stream-status ${match.has_stream ? 'available' : 'unavailable'}">
+                                ${match.has_stream ? 'Stream disponible' : 'Stream indisponible'}
+                            </p>
                         </div>
                     `;
                     
-                    matchDiv.innerHTML = matchContent;
-                    
-                    // Ajouter l'événement click seulement si le stream est disponible
-                    if (match.has_stream) {
-                        matchDiv.addEventListener('click', () => {
-                            const modal = document.getElementById('streamModal');
-                            const iframe = document.getElementById('streamIframe');
-                            iframe.src = match.stream_url;
-                            modal.style.display = 'block';
-                        });
-                    }
-                    
-                    matchesDiv.appendChild(matchDiv);
+                    // ... rest of the match card creation ...
                 });
             } catch (error) {
                 console.error('Error loading matches:', error);
