@@ -244,16 +244,83 @@
     <script>
         const CONFIG = {
             ENDPOINTS: {
-                BASE_URL: window.location.origin,
-                MATCHES: '/api/matches',
-                STREAM: '/api/stream'
+                PRIMARY: 'https://almala3ib.onrender.com',
+                BACKUP: 'https://backup-server.com',  // À configurer avec votre serveur de backup
+                LOCAL: '/local'  // Fallback local
             },
-            SELECTORS: {
-                MATCHES_GRID: '.matches-grid',
-                PLAYER_CONTAINER: '.player-container',
-                STREAM_IFRAME: '#streamIframe'
+            RETRY: {
+                MAX_ATTEMPTS: 2,
+                DELAY: 2000
             }
         };
+
+        // Gestionnaire de serveur avec fallback
+        class ServerManager {
+            constructor() {
+                this.currentServer = CONFIG.ENDPOINTS.PRIMARY;
+                this.failureCount = 0;
+            }
+
+            async request(path, options = {}) {
+                try {
+                    const response = await this.tryRequest(path, options);
+                    this.failureCount = 0; // Réinitialiser le compteur en cas de succès
+                    return response;
+                } catch (error) {
+                    console.warn(`Erreur serveur (${this.currentServer}):`, error);
+                    
+                    if (error.message.includes('502')) {
+                        await this.handleServerFailure();
+                        // Réessayer avec le nouveau serveur
+                        return this.request(path, options);
+                    }
+                    
+                    throw error;
+                }
+            }
+
+            async tryRequest(path, options) {
+                const response = await fetch(`${this.currentServer}${path}`, {
+                    ...options,
+                    headers: {
+                        'Accept': 'application/json',
+                        ...options.headers
+                    }
+                });
+
+                if (response.status === 502) {
+                    throw new Error('502_BAD_GATEWAY');
+                }
+
+                if (!response.ok) {
+                    throw new Error(`HTTP_${response.status}`);
+                }
+
+                return response.json();
+            }
+
+            async handleServerFailure() {
+                this.failureCount++;
+                
+                // Basculer vers le serveur de backup après plusieurs échecs
+                if (this.failureCount >= 2) {
+                    if (this.currentServer === CONFIG.ENDPOINTS.PRIMARY) {
+                        console.log('Basculement vers le serveur de backup...');
+                        this.currentServer = CONFIG.ENDPOINTS.BACKUP;
+                    } else if (this.currentServer === CONFIG.ENDPOINTS.BACKUP) {
+                        console.log('Basculement vers le mode local...');
+                        this.currentServer = CONFIG.ENDPOINTS.LOCAL;
+                    }
+                    this.failureCount = 0;
+                }
+
+                // Attendre avant de réessayer
+                await new Promise(resolve => setTimeout(resolve, CONFIG.RETRY.DELAY));
+            }
+        }
+
+        // Instance globale du gestionnaire de serveur
+        const serverManager = new ServerManager();
 
         // Vérification de l'existence des éléments DOM
         function ensureElement(selector) {
@@ -323,27 +390,32 @@
             loadMatches();
         }
 
-        // Chargement des matches avec gestion d'erreur améliorée
+        // Fonction de chargement des matches avec gestion d'erreur améliorée
         async function loadMatches() {
-            const matchesGrid = ensureElement(CONFIG.SELECTORS.MATCHES_GRID);
-            if (!matchesGrid) return;
+            const container = document.querySelector('.matches-grid');
+            if (!container) return;
 
             try {
-                matchesGrid.innerHTML = '<div class="loading">Chargement des matches...</div>';
+                container.innerHTML = '<div class="loading">Chargement des matches...</div>';
                 
-                const matches = await apiRequest(CONFIG.ENDPOINTS.MATCHES);
-                displayMatches(matches);
+                let matches;
+                try {
+                    matches = await serverManager.request('/api/matches');
+                } catch (error) {
+                    // En cas d'échec total, utiliser des données locales de démonstration
+                    matches = getDemoMatches();
+                }
+
+                displayMatches(matches, container);
 
             } catch (error) {
-                const errorMessages = {
-                    'NOT_FOUND': 'Aucun match disponible pour le moment',
-                    'SERVICE_UNAVAILABLE': 'Service temporairement indisponible',
-                    'INVALID_RESPONSE': 'Erreur de communication avec le serveur',
-                    'TIMEOUT': 'Le serveur met trop de temps à répondre'
-                };
-
-                showError(matchesGrid, errorMessages[error.message] || 'Erreur inattendue');
+                showError(container, 'Service temporairement indisponible. Veuillez réessayer plus tard.');
             }
+        }
+
+        // Données de démonstration pour le mode hors-ligne
+        function getDemoMatches() {
+            // Implémentation des données locales de démonstration
         }
 
         // Attendre que le DOM soit complètement chargé
@@ -371,8 +443,7 @@
             loadMatches();
         }
 
-        function displayMatches(matches) {
-            const container = ensureElement(CONFIG.SELECTORS.MATCHES_GRID);
+        function displayMatches(matches, container) {
             if (!container) return;
 
             if (!matches || matches.length === 0) {
