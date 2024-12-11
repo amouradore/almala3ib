@@ -242,49 +242,94 @@
         }
     </style>
     <script>
-        // Fonction pour charger les matches
+        // Configuration
+        const CONFIG = {
+            SELECTORS: {
+                MATCHES_GRID: '.matches-grid',
+                STREAM_IFRAME: '#streamIframe'
+            },
+            REFRESH_INTERVAL: 60000 // 1 minute
+        };
+
+        // Fonction principale de chargement des matches
         async function loadMatches() {
+            const matchesGrid = document.querySelector(CONFIG.SELECTORS.MATCHES_GRID);
+            if (!matchesGrid) return;
+
             try {
+                matchesGrid.innerHTML = '<div class="loading">Chargement des matches...</div>';
+                
                 const response = await fetch('/api/matches');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                
                 const matches = await response.json();
-                const matchesDiv = document.querySelector('.matches-grid');
-                matchesDiv.innerHTML = '';
+                
+                if (matches.error) {
+                    throw new Error(matches.error);
+                }
 
-                matches.forEach(match => {
-                    console.log(`Match: ${match.homeTeam} vs ${match.awayTeam} has_stream: ${match.has_stream}`);
-                    
-                    const matchDiv = document.createElement('div');
-                    matchDiv.className = 'match-card';
-                    matchDiv.innerHTML = `
-                        <div class="match-info">
-                            <h3>${match.homeTeam} vs ${match.awayTeam}</h3>
-                            <p class="stream-status ${match.has_stream ? 'available' : 'unavailable'}">
-                                ${match.has_stream ? 'Stream disponible' : 'Stream indisponible'}
-                            </p>
-                        </div>
-                    `;
+                if (!matches || matches.length === 0) {
+                    matchesGrid.innerHTML = '<div class="no-matches">Aucun match disponible pour le moment</div>';
+                    return;
+                }
 
-                    if (match.has_stream) {
-                        matchDiv.addEventListener('click', () => {
-                            const streamUrl = `/stream/${match.id}`;
-                            const iframe = document.getElementById('streamIframe');
-                            iframe.src = streamUrl;
-                        });
-                    }
+                displayMatches(matchesGrid, matches);
 
-                    matchesDiv.appendChild(matchDiv);
-                });
             } catch (error) {
                 console.error('Error loading matches:', error);
+                matchesGrid.innerHTML = `
+                    <div class="error-message">
+                        Impossible de charger les matches
+                        <button onclick="loadMatches()" class="retry-button">Réessayer</button>
+                    </div>`;
+            }
+        }
+
+        // Fonction d'affichage des matches
+        function displayMatches(container, matches) {
+            container.innerHTML = matches.map(match => `
+                <div class="match-card" data-match-id="${match.id}">
+                    <div class="match-info">
+                        <div class="competition">${match.competition}</div>
+                        <h3 class="teams">${match.homeTeam} vs ${match.awayTeam}</h3>
+                        <div class="stream-status ${match.has_stream ? 'available' : 'unavailable'}">
+                            ${match.has_stream ? 'Stream disponible' : 'Stream indisponible'}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Ajouter les écouteurs d'événements pour les matches avec stream
+            addStreamListeners(container);
+        }
+
+        // Ajouter les écouteurs pour le streaming
+        function addStreamListeners(container) {
+            const cards = container.querySelectorAll('.match-card');
+            cards.forEach(card => {
+                if (card.querySelector('.stream-status.available')) {
+                    card.addEventListener('click', () => {
+                        const matchId = card.dataset.matchId;
+                        if (matchId) {
+                            loadStream(matchId);
+                        }
+                    });
+                }
+            });
+        }
+
+        // Charger le stream d'un match
+        function loadStream(matchId) {
+            const iframe = document.querySelector(CONFIG.SELECTORS.STREAM_IFRAME);
+            if (iframe) {
+                iframe.src = `/stream/${matchId}`;
             }
         }
 
         // Initialisation
         document.addEventListener('DOMContentLoaded', () => {
             loadMatches();
-            
-            // Rafraîchir les matches toutes les minutes
-            setInterval(loadMatches, 60000);
+            setInterval(loadMatches, CONFIG.REFRESH_INTERVAL);
         });
 
         // Fonction pour fermer le modal
