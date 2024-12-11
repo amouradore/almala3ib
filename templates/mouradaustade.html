@@ -244,24 +244,32 @@
     <script>
         const CONFIG = {
             ENDPOINTS: {
-                BASE_URL: window.location.origin,  // URL dynamique basée sur l'hôte actuel
-                MATCHES: '/matches',
-                STREAM: '/stream'
+                BASE_URL: window.location.origin,
+                MATCHES: '/api/matches',
+                STREAM: '/api/stream'
             },
-            CACHE: {
-                DURATION: 5 * 60 * 1000, // 5 minutes
-                KEYS: {
-                    MATCHES: 'cached_matches',
-                    STREAMS: 'cached_streams'
-                }
+            SELECTORS: {
+                MATCHES_GRID: '.matches-grid',
+                PLAYER_CONTAINER: '.player-container',
+                STREAM_IFRAME: '#streamIframe'
             }
         };
+
+        // Vérification de l'existence des éléments DOM
+        function ensureElement(selector) {
+            const element = document.querySelector(selector);
+            if (!element) {
+                console.error(`Élément non trouvé: ${selector}`);
+                return null;
+            }
+            return element;
+        }
 
         // Gestionnaire principal des requêtes API
         async function apiRequest(endpoint, options = {}) {
             const url = `${CONFIG.ENDPOINTS.BASE_URL}${endpoint}`;
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
 
             try {
                 const response = await fetch(url, {
@@ -275,94 +283,80 @@
 
                 clearTimeout(timeoutId);
 
-                if (response.status === 502) {
-                    throw new Error('SERVICE_UNAVAILABLE');
-                }
-                
-                if (response.status === 404) {
-                    throw new Error('NOT_FOUND');
+                // Vérification du type de contenu
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    throw new Error('INVALID_RESPONSE');
                 }
 
                 if (!response.ok) {
-                    throw new Error(`HTTP_ERROR_${response.status}`);
+                    throw new Error(response.status === 404 ? 'NOT_FOUND' : 
+                                  response.status === 502 ? 'SERVICE_UNAVAILABLE' : 
+                                  `HTTP_ERROR_${response.status}`);
                 }
 
                 return await response.json();
 
             } catch (error) {
-                if (error.name === 'AbortError') {
-                    throw new Error('TIMEOUT');
-                }
+                console.warn(`Erreur API (${endpoint}):`, error.message);
                 throw error;
             } finally {
                 clearTimeout(timeoutId);
             }
         }
 
-        // Gestionnaire des matches
-        async function loadMatches() {
-            const matchesContainer = document.querySelector('.matches-grid');
-            
-            try {
-                // Essayer d'abord le cache
-                const cachedData = await getCachedData(CONFIG.CACHE.KEYS.MATCHES);
-                if (cachedData) {
-                    displayMatches(cachedData);
-                }
+        // Initialisation sécurisée
+        function initializeApp() {
+            const matchesGrid = ensureElement(CONFIG.SELECTORS.MATCHES_GRID);
+            if (!matchesGrid) {
+                console.error('Container des matches non trouvé');
+                return;
+            }
 
-                // Charger les données fraîches
+            // Créer le container s'il n'existe pas
+            if (!matchesGrid) {
+                const container = document.createElement('div');
+                container.className = 'matches-grid';
+                document.body.appendChild(container);
+            }
+
+            loadMatches();
+        }
+
+        // Chargement des matches avec gestion d'erreur améliorée
+        async function loadMatches() {
+            const matchesGrid = ensureElement(CONFIG.SELECTORS.MATCHES_GRID);
+            if (!matchesGrid) return;
+
+            try {
+                matchesGrid.innerHTML = '<div class="loading">Chargement des matches...</div>';
+                
                 const matches = await apiRequest(CONFIG.ENDPOINTS.MATCHES);
-                await cacheData(CONFIG.CACHE.KEYS.MATCHES, matches);
                 displayMatches(matches);
 
             } catch (error) {
-                console.warn('Erreur de chargement:', error.message);
-                
                 const errorMessages = {
+                    'NOT_FOUND': 'Aucun match disponible pour le moment',
                     'SERVICE_UNAVAILABLE': 'Service temporairement indisponible',
-                    'NOT_FOUND': 'Aucun match disponible',
-                    'TIMEOUT': 'Délai d\'attente dépassé',
-                    'DEFAULT': 'Erreur de chargement des matches'
+                    'INVALID_RESPONSE': 'Erreur de communication avec le serveur',
+                    'TIMEOUT': 'Le serveur met trop de temps à répondre'
                 };
 
-                const message = errorMessages[error.message] || errorMessages.DEFAULT;
-                
-                if (!getCachedData(CONFIG.CACHE.KEYS.MATCHES)) {
-                    showError(matchesContainer, message);
-                }
+                showError(matchesGrid, errorMessages[error.message] || 'Erreur inattendue');
             }
+        }
+
+        // Attendre que le DOM soit complètement chargé
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeApp);
+        } else {
+            initializeApp();
         }
 
         // Fonctions utilitaires
-        async function getCachedData(key) {
-            try {
-                const cached = localStorage.getItem(key);
-                if (!cached) return null;
-
-                const { data, timestamp } = JSON.parse(cached);
-                if (Date.now() - timestamp < CONFIG.CACHE.DURATION) {
-                    return data;
-                }
-                localStorage.removeItem(key);
-                return null;
-            } catch {
-                localStorage.removeItem(key);
-                return null;
-            }
-        }
-
-        async function cacheData(key, data) {
-            try {
-                localStorage.setItem(key, JSON.stringify({
-                    data,
-                    timestamp: Date.now()
-                }));
-            } catch (error) {
-                console.warn('Erreur de cache:', error);
-            }
-        }
-
         function showError(container, message) {
+            if (!container) return;
+            
             container.innerHTML = `
                 <div class="error-state">
                     <p>${message}</p>
@@ -374,15 +368,29 @@
         }
 
         function retryLoad() {
-            const matchesContainer = document.querySelector('.matches-grid');
-            matchesContainer.innerHTML = '<div class="loading">Chargement...</div>';
             loadMatches();
         }
 
-        // Initialisation
-        document.addEventListener('DOMContentLoaded', () => {
-            loadMatches();
-        });
+        function displayMatches(matches) {
+            const container = ensureElement(CONFIG.SELECTORS.MATCHES_GRID);
+            if (!container) return;
+
+            if (!matches || matches.length === 0) {
+                container.innerHTML = '<div class="no-matches">Aucun match disponible</div>';
+                return;
+            }
+
+            container.innerHTML = matches.map(match => `
+                <div class="match-card" data-match-id="${match.id}">
+                    <div class="match-info">
+                        <h3>${match.homeTeam} vs ${match.awayTeam}</h3>
+                        <p class="stream-status ${match.has_stream ? 'available' : 'unavailable'}">
+                            ${match.has_stream ? 'Stream disponible' : 'Stream indisponible'}
+                        </p>
+                    </div>
+                </div>
+            `).join('');
+        }
 
         // Fonction pour fermer le modal
         function closeStream() {
