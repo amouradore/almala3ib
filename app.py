@@ -9,18 +9,31 @@ def index():
 
 @app.route('/api/matches')
 def get_matches():
-    # Récupération des matches depuis l'API externe
+    # URL de l'API ScoreBat avec votre token
+    API_URL = "https://www.scorebat.com/video-api/v3/feed/?token=MTg5OTQ1XzFiZTM1NDcwZGY3OGQ5YTkzM2M5Nzg4M2Q2M2VlNWQwMGNmNDFhYTRfMTczMzkzODAxNg=="
+    
     try:
-        response = requests.get('URL_DE_VOTRE_API_EXTERNE')
-        matches = response.json()
-        return jsonify(matches)
+        response = requests.get(API_URL)
+        if response.ok:
+            data = response.json()
+            matches = []
+            for match in data.get('response', []):
+                matches.append({
+                    'id': match.get('matchId', ''),
+                    'homeTeam': match.get('homeTeam', {}).get('name', ''),
+                    'awayTeam': match.get('awayTeam', {}).get('name', ''),
+                    'competition': match.get('competition', ''),
+                    'has_stream': bool(match.get('videos', [])),
+                    'thumbnail': match.get('thumbnail', ''),
+                    'date': match.get('date', '')
+                })
+            return jsonify(matches)
     except Exception as e:
-        print(f"Erreur: {e}")
+        print(f"Erreur API: {e}")
         return jsonify([])
 
 @app.route('/stream/<match_id>')
 def stream(match_id):
-    # Logique pour le streaming
     return render_template('stream.html', match_id=match_id)
 
 if __name__ == '__main__':
