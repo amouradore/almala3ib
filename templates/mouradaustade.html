@@ -242,11 +242,17 @@
         }
     </style>
     <script>
-        // Configuration simple
+        // Configuration
         const APP_CONFIG = {
             container: '.matches-grid',
             api: '/api/matches',
-            refreshInterval: 60000
+            refreshInterval: 60000,
+            messages: {
+                loading: 'Chargement des matches...',
+                noMatches: 'Aucun match disponible pour le moment',
+                error: 'Impossible de charger les matches',
+                retry: 'Réessayer'
+            }
         };
 
         // Fonction principale
@@ -258,7 +264,6 @@
                 return;
             }
 
-            // Chargement initial
             loadMatches(container);
 
             // Rafraîchissement périodique
@@ -276,6 +281,12 @@
             try {
                 showLoading(container);
                 const matches = await fetchMatches();
+                
+                if (!matches || matches.length === 0) {
+                    showNoMatches(container);
+                    return;
+                }
+                
                 displayMatches(container, matches);
             } catch (error) {
                 console.error('Erreur:', error);
@@ -295,41 +306,92 @@
             }
         }
 
-        // Affichage des états
+        // États d'affichage
         function showLoading(container) {
-            container.innerHTML = '<div class="loading">Chargement des matches...</div>';
+            container.innerHTML = `
+                <div class="loading-state">
+                    <p>${APP_CONFIG.messages.loading}</p>
+                </div>
+            `;
+        }
+
+        function showNoMatches(container) {
+            container.innerHTML = `
+                <div class="no-matches-state">
+                    <div class="info-message">
+                        <h3>${APP_CONFIG.messages.noMatches}</h3>
+                        <p>Revenez plus tard pour voir les prochains matches</p>
+                    </div>
+                    <button onclick="loadMatches(document.querySelector('${APP_CONFIG.container}'))" class="retry-button">
+                        ${APP_CONFIG.messages.retry}
+                    </button>
+                </div>
+            `;
         }
 
         function showError(container) {
             container.innerHTML = `
                 <div class="error-state">
-                    <p>Impossible de charger les matches</p>
-                    <button onclick="loadMatches(document.querySelector('${APP_CONFIG.container}'))">
-                        Réessayer
+                    <div class="error-message">
+                        <h3>${APP_CONFIG.messages.error}</h3>
+                        <p>Veuillez réessayer dans quelques instants</p>
+                    </div>
+                    <button onclick="loadMatches(document.querySelector('${APP_CONFIG.container}'))" class="retry-button">
+                        ${APP_CONFIG.messages.retry}
                     </button>
                 </div>
             `;
         }
 
         function displayMatches(container, matches) {
-            if (!matches || matches.length === 0) {
-                container.innerHTML = '<div class="no-matches">Aucun match disponible</div>';
-                return;
-            }
-
             container.innerHTML = matches.map(match => `
-                <div class="match-card">
-                    <div class="match-info">
-                        <h3>${match.homeTeam} vs ${match.awayTeam}</h3>
-                        <p class="stream-status">
+                <div class="match-card ${match.status || 'unknown'}">
+                    <div class="match-header">
+                        <div class="competition">${match.competition || ''}</div>
+                        <div class="match-time">${match.time || ''}</div>
+                    </div>
+                    <div class="match-content">
+                        <div class="team home">
+                            <img src="${match.homeTeamLogo || ''}" alt="${match.homeTeam}" class="team-logo">
+                            <span class="team-name">${match.homeTeam}</span>
+                        </div>
+                        <div class="score">${match.score || 'vs'}</div>
+                        <div class="team away">
+                            <img src="${match.awayTeamLogo || ''}" alt="${match.awayTeam}" class="team-logo">
+                            <span class="team-name">${match.awayTeam}</span>
+                        </div>
+                    </div>
+                    <div class="match-footer">
+                        <span class="status ${match.has_stream ? 'available' : 'unavailable'}">
                             ${match.has_stream ? 'Stream disponible' : 'Stream indisponible'}
-                        </p>
+                        </span>
                     </div>
                 </div>
             `).join('');
         }
 
-        // Initialisation sécurisée
+        // Initialisation
+        function initMatchesApp() {
+            const container = document.querySelector(APP_CONFIG.container);
+            
+            if (!container) {
+                console.error('Container des matches non trouvé');
+                return;
+            }
+
+            loadMatches(container);
+
+            // Rafraîchissement périodique
+            if (APP_CONFIG.refreshInterval > 0) {
+                setInterval(() => {
+                    if (document.visibilityState === 'visible') {
+                        loadMatches(container);
+                    }
+                }, APP_CONFIG.refreshInterval);
+            }
+        }
+
+        // Démarrage sécurisé
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', initMatchesApp);
         } else {
