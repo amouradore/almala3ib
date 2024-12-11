@@ -242,104 +242,50 @@
         }
     </style>
     <script>
-        // Configuration simple
-        const APP_CONFIG = {
-            container: '.matches-grid',
-            api: 'https://api.footballdata.org/v4/matches', // API des vrais matches
-            headers: {
-                'X-Auth-Token': 'YOUR_API_KEY' // Votre clé API
-            }
-        };
-
-        // Chargement des matches du jour
-        async function loadMatches(container) {
+        // Fonction pour charger les matches
+        async function loadMatches() {
             try {
-                showLoading(container);
-                const matches = await fetchTodayMatches();
-                displayMatches(container, matches);
-            } catch (error) {
-                console.error('Erreur:', error);
-                showError(container);
-            }
-        }
+                const response = await fetch('/api/matches');
+                const matches = await response.json();
+                const matchesDiv = document.querySelector('.matches-grid');
+                matchesDiv.innerHTML = '';
 
-        // Récupération des matches du jour
-        async function fetchTodayMatches() {
-            const today = new Date().toISOString().split('T')[0];
-            const url = `${APP_CONFIG.api}?date=${today}`;
-            
-            try {
-                const response = await fetch(url, {
-                    headers: APP_CONFIG.headers
+                matches.forEach(match => {
+                    console.log(`Match: ${match.homeTeam} vs ${match.awayTeam} has_stream: ${match.has_stream}`);
+                    
+                    const matchDiv = document.createElement('div');
+                    matchDiv.className = 'match-card';
+                    matchDiv.innerHTML = `
+                        <div class="match-info">
+                            <h3>${match.homeTeam} vs ${match.awayTeam}</h3>
+                            <p class="stream-status ${match.has_stream ? 'available' : 'unavailable'}">
+                                ${match.has_stream ? 'Stream disponible' : 'Stream indisponible'}
+                            </p>
+                        </div>
+                    `;
+
+                    if (match.has_stream) {
+                        matchDiv.addEventListener('click', () => {
+                            const streamUrl = `/stream/${match.id}`;
+                            const iframe = document.getElementById('streamIframe');
+                            iframe.src = streamUrl;
+                        });
+                    }
+
+                    matchesDiv.appendChild(matchDiv);
                 });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                return data.matches || [];
             } catch (error) {
-                console.warn('Erreur API:', error);
-                return [];
+                console.error('Error loading matches:', error);
             }
-        }
-
-        // Affichage des matches
-        function displayMatches(container, matches) {
-            if (!matches || matches.length === 0) {
-                container.innerHTML = '<div class="no-matches">Aucun match disponible</div>';
-                return;
-            }
-
-            container.innerHTML = matches.map(match => `
-                <div class="match-card">
-                    <div class="match-info">
-                        <h3>${match.homeTeam} vs ${match.awayTeam}</h3>
-                        <p class="stream-status ${match.has_stream ? 'available' : 'unavailable'}">
-                            ${match.has_stream ? 'Stream disponible' : 'Stream indisponible'}
-                        </p>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function showLoading(container) {
-            container.innerHTML = '<div class="loading">Chargement des matches...</div>';
-        }
-
-        function showError(container) {
-            container.innerHTML = `
-                <div class="error-state">
-                    <p>Impossible de charger les matches</p>
-                    <button onclick="loadMatches(document.querySelector('${APP_CONFIG.container}'))">
-                        Réessayer
-                    </button>
-                </div>
-            `;
         }
 
         // Initialisation
-        function initMatchesApp() {
-            const container = document.querySelector(APP_CONFIG.container);
-            if (!container) return;
-
-            loadMatches(container);
-
-            // Rafraîchissement toutes les minutes
-            setInterval(() => {
-                if (document.visibilityState === 'visible') {
-                    loadMatches(container);
-                }
-            }, 60000);
-        }
-
-        // Démarrage
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initMatchesApp);
-        } else {
-            initMatchesApp();
-        }
+        document.addEventListener('DOMContentLoaded', () => {
+            loadMatches();
+            
+            // Rafraîchir les matches toutes les minutes
+            setInterval(loadMatches, 60000);
+        });
 
         // Fonction pour fermer le modal
         function closeStream() {
