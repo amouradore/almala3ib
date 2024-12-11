@@ -242,163 +242,99 @@
         }
     </style>
     <script>
-        // Configuration globale
-        const CONFIG = {
-            SELECTORS: {
-                MATCHES_CONTAINER: '.matches-grid',
-                STREAM_CONTAINER: '.player-container',
-                STREAM_IFRAME: '#streamIframe'
-            },
-            API: {
-                BASE_URL: window.location.origin,
-                ENDPOINTS: {
-                    MATCHES: '/api/matches',
-                    STREAM: '/api/stream'
-                }
-            }
+        // Configuration simple
+        const APP_CONFIG = {
+            container: '.matches-grid',
+            api: '/api/matches',
+            refreshInterval: 60000
         };
 
-        // Classe principale de l'application
-        class MatchesApp {
-            constructor() {
-                this.matchesContainer = document.querySelector(CONFIG.SELECTORS.MATCHES_CONTAINER);
-                this.init();
+        // Fonction principale
+        function initMatchesApp() {
+            const container = document.querySelector(APP_CONFIG.container);
+            
+            if (!container) {
+                console.error('Container des matches non trouvé');
+                return;
             }
 
-            init() {
-                if (!this.matchesContainer) {
-                    console.error('Container des matches non trouvé');
-                    return;
-                }
+            // Chargement initial
+            loadMatches(container);
 
-                this.loadMatches();
-                this.setupRefresh();
-            }
-
-            setupRefresh() {
-                // Rafraîchir les données toutes les minutes si la page est visible
+            // Rafraîchissement périodique
+            if (APP_CONFIG.refreshInterval > 0) {
                 setInterval(() => {
                     if (document.visibilityState === 'visible') {
-                        this.loadMatches();
+                        loadMatches(container);
                     }
-                }, 60000);
+                }, APP_CONFIG.refreshInterval);
+            }
+        }
+
+        // Chargement des matches
+        async function loadMatches(container) {
+            try {
+                showLoading(container);
+                const matches = await fetchMatches();
+                displayMatches(container, matches);
+            } catch (error) {
+                console.error('Erreur:', error);
+                showError(container);
+            }
+        }
+
+        // Récupération des données
+        async function fetchMatches() {
+            try {
+                const response = await fetch(APP_CONFIG.api);
+                if (!response.ok) return [];
+                return await response.json();
+            } catch (error) {
+                console.warn('Erreur API:', error);
+                return [];
+            }
+        }
+
+        // Affichage des états
+        function showLoading(container) {
+            container.innerHTML = '<div class="loading">Chargement des matches...</div>';
+        }
+
+        function showError(container) {
+            container.innerHTML = `
+                <div class="error-state">
+                    <p>Impossible de charger les matches</p>
+                    <button onclick="loadMatches(document.querySelector('${APP_CONFIG.container}'))">
+                        Réessayer
+                    </button>
+                </div>
+            `;
+        }
+
+        function displayMatches(container, matches) {
+            if (!matches || matches.length === 0) {
+                container.innerHTML = '<div class="no-matches">Aucun match disponible</div>';
+                return;
             }
 
-            async loadMatches() {
-                try {
-                    this.showLoading();
-                    const matches = await this.fetchMatches();
-                    
-                    if (!matches || matches.length === 0) {
-                        this.showNoMatches();
-                        return;
-                    }
-
-                    this.displayMatches(matches);
-
-                } catch (error) {
-                    console.error('Erreur de chargement:', error);
-                    this.showError();
-                }
-            }
-
-            async fetchMatches() {
-                try {
-                    const response = await fetch(`${CONFIG.API.BASE_URL}${CONFIG.API.ENDPOINTS.MATCHES}`);
-                    
-                    if (response.status === 404) {
-                        return this.getFallbackMatches();
-                    }
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
-                    return await response.json();
-
-                } catch (error) {
-                    console.warn('Erreur API:', error);
-                    return this.getFallbackMatches();
-                }
-            }
-
-            getFallbackMatches() {
-                // Données de repli en cas d'erreur
-                return [
-                    {
-                        id: 'demo1',
-                        homeTeam: 'Pas de matches disponibles',
-                        awayTeam: 'pour le moment',
-                        status: 'unavailable',
-                        has_stream: false
-                    }
-                ];
-            }
-
-            showLoading() {
-                if (this.matchesContainer) {
-                    this.matchesContainer.innerHTML = `
-                        <div class="loading-state">
-                            <p>Chargement des matches...</p>
-                        </div>
-                    `;
-                }
-            }
-
-            showError() {
-                if (this.matchesContainer) {
-                    this.matchesContainer.innerHTML = `
-                        <div class="error-state">
-                            <p>Impossible de charger les matches</p>
-                            <button onclick="app.loadMatches()" class="retry-button">
-                                Réessayer
-                            </button>
-                        </div>
-                    `;
-                }
-            }
-
-            showNoMatches() {
-                if (this.matchesContainer) {
-                    this.matchesContainer.innerHTML = `
-                        <div class="no-matches-state">
-                            <p>Aucun match disponible pour le moment</p>
-                        </div>
-                    `;
-                }
-            }
-
-            displayMatches(matches) {
-                if (!this.matchesContainer) return;
-
-                this.matchesContainer.innerHTML = matches.map(match => `
-                    <div class="match-card" data-match-id="${match.id || ''}">
-                        <div class="match-info">
-                            <h3>${match.homeTeam} vs ${match.awayTeam}</h3>
-                            <p class="match-status ${match.status || 'unknown'}">${match.status || 'Status inconnu'}</p>
-                            <p class="stream-status ${match.has_stream ? 'available' : 'unavailable'}">
-                                ${match.has_stream ? 'Stream disponible' : 'Stream indisponible'}
-                            </p>
-                        </div>
+            container.innerHTML = matches.map(match => `
+                <div class="match-card">
+                    <div class="match-info">
+                        <h3>${match.homeTeam} vs ${match.awayTeam}</h3>
+                        <p class="stream-status">
+                            ${match.has_stream ? 'Stream disponible' : 'Stream indisponible'}
+                        </p>
                     </div>
-                `).join('');
-            }
+                </div>
+            `).join('');
         }
 
         // Initialisation sécurisée
-        let app;
-        function initApp() {
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', () => {
-                    app = new MatchesApp();
-                });
-            } else {
-                app = new MatchesApp();
-            }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initMatchesApp);
+        } else {
+            initMatchesApp();
         }
-
-        // Démarrage de l'application
-        initApp();
 
         // Fonction pour fermer le modal
         function closeStream() {
