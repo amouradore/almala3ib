@@ -259,10 +259,10 @@
                     matchDiv.className = 'match-card';
                     matchDiv.innerHTML = `
                         <div class="match-info">
-                            <h3>${match.homeTeam} vs ${match.awayTeam}</h3>
-                            <p class="stream-status ${match.has_stream ? 'available' : 'unavailable'}">
-                                ${match.has_stream ? 'Stream disponible' : 'Stream indisponible'}
-                            </p>
+                            <div class="competition">${match.competition}</div>
+                            <div class="time">${match.time}</div>
+                            <div class="status ${match.status === 'LIVE' ? 'live' : ''}">${match.status}</div>
+                            ${match.has_stream ? '<div class="stream-available">📺 Stream disponible</div>' : ''}
                         </div>
                     `;
                     
@@ -387,37 +387,43 @@
                             marginheight="0" 
                             marginwidth="0" 
                             scrolling="no" 
-                            allowfullscreen="yes"
                             allow="encrypted-media; autoplay; fullscreen; picture-in-picture"
                             loading="lazy"
                             frameborder="0">
                     </iframe>
                 </div>
 
-                <!-- Contrôles personnalisés -->
-                <div class="player-controls">
-                    <button class="quality-selector">Qualité</button>
-                    <button class="fullscreen-toggle">Plein écran</button>
-                </div>
-
                 <script>
-                    // Optimisation du chargement du stream
                     document.addEventListener('DOMContentLoaded', function() {
                         const streamIframe = document.getElementById('streamIframe');
                         
-                        // Chargement différé du stream
-                        setTimeout(() => {
-                            streamIframe.src = 'URL_DU_STREAM';
-                        }, 1000);
+                        // Gestion des erreurs de chargement
+                        streamIframe.onerror = function() {
+                            console.error('Erreur de chargement du stream');
+                            // Afficher un message d'erreur à l'utilisateur
+                            showErrorMessage('Le stream n\'est pas disponible pour le moment');
+                        };
 
-                        // Gestion de la qualité adaptative
-                        function adjustStreamQuality() {
-                            const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                            if (connection) {
-                                // Ajuster la qualité en fonction de la connexion
-                                const bandwidth = connection.downlink; // Mbps
-                                // Logique d'adaptation de la qualité
-                            }
+                        // Fonction pour afficher les messages d'erreur
+                        function showErrorMessage(message) {
+                            const errorDiv = document.createElement('div');
+                            errorDiv.className = 'error-message';
+                            errorDiv.textContent = message;
+                            streamIframe.parentNode.appendChild(errorDiv);
+                        }
+
+                        // Vérification de la disponibilité du stream
+                        function checkStreamAvailability(matchId) {
+                            fetch(`/api/stream-status/${matchId}`)
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (!data.has_stream) {
+                                        showErrorMessage('Ce match n\'est pas disponible en streaming');
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('Erreur lors de la vérification du stream:', error);
+                                });
                         }
                     });
                 </script>
