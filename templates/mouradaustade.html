@@ -243,134 +243,146 @@
     </style>
     <script>
         const CONFIG = {
-            API_ENDPOINTS: {
-                MATCHES: '/api/matches',
-                STREAM: '/api/stream',
+            ENDPOINTS: {
+                BASE_URL: window.location.origin,  // URL dynamique basée sur l'hôte actuel
+                MATCHES: '/matches',
+                STREAM: '/stream'
             },
-            RETRY_ATTEMPTS: 2,
-            RETRY_DELAY: 1000,
+            CACHE: {
+                DURATION: 5 * 60 * 1000, // 5 minutes
+                KEYS: {
+                    MATCHES: 'cached_matches',
+                    STREAMS: 'cached_streams'
+                }
+            }
         };
 
-        async function fetchWithRetry(url, attempts = CONFIG.RETRY_ATTEMPTS) {
+        // Gestionnaire principal des requêtes API
+        async function apiRequest(endpoint, options = {}) {
+            const url = `${CONFIG.ENDPOINTS.BASE_URL}${endpoint}`;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
             try {
-                const response = await fetch(url);
-                if (response.ok) return response.json();
-                
+                const response = await fetch(url, {
+                    ...options,
+                    signal: controller.signal,
+                    headers: {
+                        'Accept': 'application/json',
+                        ...options.headers
+                    }
+                });
+
+                clearTimeout(timeoutId);
+
                 if (response.status === 502) {
-                    throw new Error('Serveur temporairement indisponible');
-                }
-                throw new Error(`Erreur HTTP: ${response.status}`);
-                
-            } catch (error) {
-                if (attempts > 0) {
-                    console.log(`Tentative de reconnexion... (${attempts} restantes)`);
-                    await new Promise(resolve => setTimeout(resolve, CONFIG.RETRY_DELAY));
-                    return fetchWithRetry(url, attempts - 1);
+                    throw new Error('SERVICE_UNAVAILABLE');
                 }
                 
-                // Essayer le serveur de secours
-                try {
-                    const backupUrl = url.replace(CONFIG.API_ENDPOINTS.PRIMARY, CONFIG.API_ENDPOINTS.BACKUP);
-                    const backupResponse = await fetch(backupUrl);
-                    if (backupResponse.ok) return backupResponse.json();
-                } catch (backupError) {
-                    console.error('Erreur sur le serveur de secours:', backupError);
+                if (response.status === 404) {
+                    throw new Error('NOT_FOUND');
                 }
 
-                // Afficher un message d'erreur convivial
-                showErrorMessage(`
-                    <div class="error-container">
-                        <h3>Service temporairement indisponible</h3>
-                        <p>Nous rencontrons des difficultés techniques. Veuillez réessayer dans quelques minutes.</p>
-                        <button onclick="location.reload()">Rafraîchir la page</button>
-                    </div>
-                `);
-                
+                if (!response.ok) {
+                    throw new Error(`HTTP_ERROR_${response.status}`);
+                }
+
+                return await response.json();
+
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    throw new Error('TIMEOUT');
+                }
                 throw error;
+            } finally {
+                clearTimeout(timeoutId);
             }
         }
 
-        function showErrorMessage(message) {
-            const container = document.querySelector('.player-container') || document.body;
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-message';
-            errorDiv.innerHTML = message;
-            container.appendChild(errorDiv);
-        }
-
-        // Utilisation
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                const stream = await fetchWithRetry(`${CONFIG.API_ENDPOINTS.PRIMARY}api/stream`);
-                // Traitement du stream...
-            } catch (error) {
-                console.error('Erreur fatale:', error);
-            }
-        });
-
+        // Gestionnaire des matches
         async function loadMatches() {
-            const matchesDiv = document.querySelector('.matches-grid');
+            const matchesContainer = document.querySelector('.matches-grid');
             
             try {
-                // Charger les matches depuis le cache d'abord
-                const cachedMatches = getCachedMatches();
-                if (cachedMatches) {
-                    displayMatches(cachedMatches);
+                // Essayer d'abord le cache
+                const cachedData = await getCachedData(CONFIG.CACHE.KEYS.MATCHES);
+                if (cachedData) {
+                    displayMatches(cachedData);
                 }
 
-                // Tenter de charger les données fraîches
-                const response = await fetch(CONFIG.API_ENDPOINTS.MATCHES);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const matches = await response.json();
-                cacheMatches(matches);
+                // Charger les données fraîches
+                const matches = await apiRequest(CONFIG.ENDPOINTS.MATCHES);
+                await cacheData(CONFIG.CACHE.KEYS.MATCHES, matches);
                 displayMatches(matches);
 
             } catch (error) {
-                console.warn('Erreur de chargement des matches:', error);
-                if (!getCachedMatches()) {
-                    displayError(matchesDiv, 'Impossible de charger les matches');
+                console.warn('Erreur de chargement:', error.message);
+                
+                const errorMessages = {
+                    'SERVICE_UNAVAILABLE': 'Service temporairement indisponible',
+                    'NOT_FOUND': 'Aucun match disponible',
+                    'TIMEOUT': 'Délai d\'attente dépassé',
+                    'DEFAULT': 'Erreur de chargement des matches'
+                };
+
+                const message = errorMessages[error.message] || errorMessages.DEFAULT;
+                
+                if (!getCachedData(CONFIG.CACHE.KEYS.MATCHES)) {
+                    showError(matchesContainer, message);
                 }
             }
         }
 
-        function displayMatches(matches) {
-            const matchesDiv = document.querySelector('.matches-grid');
-            matchesDiv.innerHTML = '';
+        // Fonctions utilitaires
+        async function getCachedData(key) {
+            try {
+                const cached = localStorage.getItem(key);
+                if (!cached) return null;
 
-            if (!matches || matches.length === 0) {
-                matchesDiv.innerHTML = '<div class="no-matches">Aucun match disponible pour le moment</div>';
-                return;
+                const { data, timestamp } = JSON.parse(cached);
+                if (Date.now() - timestamp < CONFIG.CACHE.DURATION) {
+                    return data;
+                }
+                localStorage.removeItem(key);
+                return null;
+            } catch {
+                localStorage.removeItem(key);
+                return null;
             }
-
-            matches.forEach(match => {
-                const matchDiv = document.createElement('div');
-                matchDiv.className = 'match-card';
-                matchDiv.innerHTML = `
-                    <div class="match-info">
-                        <h3>${match.homeTeam} vs ${match.awayTeam}</h3>
-                        <p class="stream-status ${match.has_stream ? 'available' : 'unavailable'}">
-                            ${match.has_stream ? 'Stream disponible' : 'Stream indisponible'}
-                        </p>
-                    </div>
-                `;
-                matchesDiv.appendChild(matchDiv);
-            });
         }
 
-        async function fetchLocalMatches() {
-            // Données de repli en cas d'échec de l'API
-            return [
-                {
-                    homeTeam: "Équipe locale 1",
-                    awayTeam: "Équipe visiteur 1",
-                    has_stream: true
-                },
-                // Ajoutez d'autres matches par défaut si nécessaire
-            ];
+        async function cacheData(key, data) {
+            try {
+                localStorage.setItem(key, JSON.stringify({
+                    data,
+                    timestamp: Date.now()
+                }));
+            } catch (error) {
+                console.warn('Erreur de cache:', error);
+            }
         }
+
+        function showError(container, message) {
+            container.innerHTML = `
+                <div class="error-state">
+                    <p>${message}</p>
+                    <button onclick="retryLoad()" class="retry-button">
+                        Réessayer
+                    </button>
+                </div>
+            `;
+        }
+
+        function retryLoad() {
+            const matchesContainer = document.querySelector('.matches-grid');
+            matchesContainer.innerHTML = '<div class="loading">Chargement...</div>';
+            loadMatches();
+        }
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', () => {
+            loadMatches();
+        });
 
         // Fonction pour fermer le modal
         function closeStream() {
@@ -426,32 +438,9 @@
             `;
         }
 
-        function getCachedMatches() {
-            const cached = localStorage.getItem('matches');
-            if (!cached) return null;
-            
-            try {
-                const { data, timestamp } = JSON.parse(cached);
-                // Vérifier si le cache est récent (moins de 5 minutes)
-                if (Date.now() - timestamp < 5 * 60 * 1000) {
-                    return data;
-                }
-            } catch (e) {
-                localStorage.removeItem('matches');
-            }
-            return null;
-        }
-
-        function cacheMatches(matches) {
-            localStorage.setItem('matches', JSON.stringify({
-                data: matches,
-                timestamp: Date.now()
-            }));
-        }
-
         async function getStreamUrl(matchId) {
             try {
-                const response = await fetch(`${CONFIG.API_ENDPOINTS.STREAM}/${matchId}`);
+                const response = await fetch(`${CONFIG.ENDPOINTS.BASE_URL}${CONFIG.ENDPOINTS.STREAM}/${matchId}`);
                 if (!response.ok) return null;
                 const data = await response.json();
                 return data.streamUrl;
@@ -460,17 +449,12 @@
             }
         }
 
-        // Initialisation
-        document.addEventListener('DOMContentLoaded', () => {
-            loadMatches();
-            
-            // Gestionnaire d'événements pour les cartes de match
-            document.querySelector('.matches-grid').addEventListener('click', (e) => {
-                const matchCard = e.target.closest('.match-card');
-                if (matchCard && matchCard.dataset.matchId) {
-                    loadStream(matchCard.dataset.matchId);
-                }
-            });
+        // Gestionnaire d'événements pour les cartes de match
+        document.querySelector('.matches-grid').addEventListener('click', (e) => {
+            const matchCard = e.target.closest('.match-card');
+            if (matchCard && matchCard.dataset.matchId) {
+                loadStream(matchCard.dataset.matchId);
+            }
         });
     </script>
     <script>
