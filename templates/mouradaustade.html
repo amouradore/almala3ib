@@ -309,34 +309,90 @@
         });
 
         async function loadMatches() {
+            const API_URL = 'https://almala3ib.onrender.com/api/matches';
+            const FALLBACK_URL = '/local/matches'; // URL de repli locale
+
             try {
-                const response = await fetch('/api/matches');
-                const matches = await response.json();
-                const matchesDiv = document.querySelector('.matches-grid');
-                matchesDiv.innerHTML = '';
+                // Première tentative avec l'API principale
+                const response = await fetch(API_URL);
+                
+                // Vérification du type de contenu
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    throw new Error('Format de réponse invalide');
+                }
 
-                matches.forEach(match => {
-                    if (!match.has_stream) {
-                        console.log(`Match: ${match.homeTeam} vs ${match.awayTeam} has_stream: false`);
-                        return; // Skip matches without streams
+                // Vérification du statut HTTP
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        console.warn('API endpoint non trouvé, utilisation des données locales');
+                        return await fetchLocalMatches();
                     }
+                    throw new Error(`Erreur HTTP: ${response.status}`);
+                }
 
-                    const matchDiv = document.createElement('div');
-                    matchDiv.className = 'match-card';
-                    matchDiv.innerHTML = `
-                        <div class="match-info">
-                            <div class="competition">${match.competition}</div>
-                            <div class="time">${match.time}</div>
-                            <div class="status ${match.status === 'LIVE' ? 'live' : ''}">${match.status}</div>
-                            ${match.has_stream ? '<div class="stream-available">📺 Stream disponible</div>' : ''}
-                        </div>
-                    `;
-                    
-                    // ... rest of the match card creation ...
-                });
+                const matches = await response.json();
+                displayMatches(matches);
+
             } catch (error) {
-                console.error('Error loading matches:', error);
+                console.error('Erreur de chargement des matches:', error);
+                
+                // Affichage d'un message d'erreur utilisateur
+                const matchesDiv = document.querySelector('.matches-grid');
+                matchesDiv.innerHTML = `
+                    <div class="error-state">
+                        <h3>Impossible de charger les matches</h3>
+                        <p>Nous rencontrons des difficultés techniques. Veuillez réessayer plus tard.</p>
+                        <button onclick="loadMatches()" class="retry-button">
+                            Réessayer
+                        </button>
+                    </div>
+                `;
+
+                // Tentative de chargement des données locales
+                try {
+                    const localMatches = await fetchLocalMatches();
+                    displayMatches(localMatches);
+                } catch (fallbackError) {
+                    console.error('Échec du chargement des données locales:', fallbackError);
+                }
             }
+        }
+
+        function displayMatches(matches) {
+            const matchesDiv = document.querySelector('.matches-grid');
+            matchesDiv.innerHTML = '';
+
+            if (!matches || matches.length === 0) {
+                matchesDiv.innerHTML = '<div class="no-matches">Aucun match disponible pour le moment</div>';
+                return;
+            }
+
+            matches.forEach(match => {
+                const matchDiv = document.createElement('div');
+                matchDiv.className = 'match-card';
+                matchDiv.innerHTML = `
+                    <div class="match-info">
+                        <h3>${match.homeTeam} vs ${match.awayTeam}</h3>
+                        <p class="stream-status ${match.has_stream ? 'available' : 'unavailable'}">
+                            ${match.has_stream ? 'Stream disponible' : 'Stream indisponible'}
+                        </p>
+                    </div>
+                `;
+                matchesDiv.appendChild(matchDiv);
+            });
+        }
+
+        async function fetchLocalMatches() {
+            // Données de repli en cas d'échec de l'API
+            return [
+                {
+                    homeTeam: "Équipe locale 1",
+                    awayTeam: "Équipe visiteur 1",
+                    has_stream: true
+                },
+                // Ajoutez d'autres matches par défaut si nécessaire
+            ];
         }
 
         // Fonction pour fermer le modal
