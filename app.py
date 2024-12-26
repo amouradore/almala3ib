@@ -7,7 +7,11 @@ app = Flask(__name__)
 # Configuration de l'API
 API_BASE_URL = "https://api.sofascore.com/api/v1"
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': '*/*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Referer': 'https://www.sofascore.com/',
+    'Origin': 'https://www.sofascore.com'
 }
 
 @app.route('/')
@@ -41,28 +45,8 @@ def get_matches():
         
         return jsonify(matches)
         
-    except Exception as e:
-        print(f"Erreur lors de la récupération des matches: {e}")
-        return jsonify([
-            {
-                'id': '1',
-                'homeTeam': 'Paris Saint-Germain',
-                'awayTeam': 'Manchester City',
-                'competition': 'UEFA Champions League',
-                'time': '21:00',
-                'status': 'Scheduled',
-                'has_stream': True
-            },
-            {
-                'id': '2',
-                'homeTeam': 'Real Madrid',
-                'awayTeam': 'Barcelona',
-                'competition': 'La Liga',
-                'time': '20:00',
-                'status': 'Live',
-                'has_stream': True
-            }
-        ])
+    except requests.exceptions.RequestException as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/stream/<match_id>')
 def stream(match_id):
